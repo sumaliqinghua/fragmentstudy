@@ -13,6 +13,7 @@ interface RequestBody {
   messages: { role: string; content: string }[];
   stream?: boolean;
   temperature?: number;
+  response_format?: unknown;
 }
 
 Deno.serve(async (req: Request) => {
@@ -25,7 +26,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: RequestBody = await req.json();
-    const { apiKey, apiEndpoint, model, messages, stream = false, temperature = 0.7 } = body;
+    const { apiKey, apiEndpoint, model, messages, stream = false, temperature = 0.7, response_format } = body;
 
     if (!apiKey || !apiEndpoint) {
       return new Response(
@@ -47,6 +48,7 @@ Deno.serve(async (req: Request) => {
         model,
         messages,
         stream,
+        ...(response_format ? { response_format } : {}),
         temperature,
       }),
     });

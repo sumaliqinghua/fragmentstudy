@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, FileText, HelpCircle, Layers, MessageCircle, Sparkles, Tv, Users, X } from 'lucide-react';
 import {
   createCards,
@@ -11,7 +11,7 @@ import {
   getGalgameMessages,
   getQuizQuestions,
 } from '../services/dataService';
-import { convertToDialogue, convertToGalgame, generateQuizQuestions, isConfigured, splitArticle } from '../services/openai';
+import { AIResponseParseError, convertToDialogue, convertToGalgame, generateQuizQuestions, isConfigured, splitArticle } from '../services/openai';
 import { OriginalTextView } from '../components/OriginalTextView';
 import type { Article } from '../types';
 
@@ -42,6 +42,10 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
   const [processingStatus, setProcessingStatus] = useState('');
   const [characters, setCharacters] = useState('');
   const [characterModal, setCharacterModal] = useState<CharacterModalState>({ isOpen: false, mode: null });
+  const [showRawModal, setShowRawModal] = useState(false);
+  const [rawAIResponse, setRawAIResponse] = useState('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const toastTimerRef = useRef<number | null>(null);
 
   const loadArticle = async () => {
     setIsLoading(true);
@@ -78,6 +82,23 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
     loadArticle();
   }, [articleId]);
 
+  useEffect(() => {
+    if (!error) return;
+    setShowErrorToast(true);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setShowErrorToast(false);
+    }, 5000);
+
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, [error]);
+
   const ensureConfigured = () => {
     if (!isConfigured()) {
       setError('请先在设置中配置 API Key');
@@ -100,6 +121,10 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
       setProcessingStatus('完成!');
     } catch (err) {
       console.error('Failed to generate cards:', err);
+      if (err instanceof AIResponseParseError) {
+        setRawAIResponse(err.rawText);
+        setShowRawModal(true);
+      }
       setError(err instanceof Error ? err.message : '生成卡片失败，请重试');
     } finally {
       setIsGenerating(false);
@@ -134,6 +159,10 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
       setCharacterModal({ isOpen: false, mode: null });
     } catch (err) {
       console.error('Failed to generate mode:', err);
+      if (err instanceof AIResponseParseError) {
+        setRawAIResponse(err.rawText);
+        setShowRawModal(true);
+      }
       setError(err instanceof Error ? err.message : '生成失败，请重试');
     } finally {
       setIsGenerating(false);
@@ -158,6 +187,10 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
       setProcessingStatus('完成!');
     } catch (err) {
       console.error('Failed to generate quiz:', err);
+      if (err instanceof AIResponseParseError) {
+        setRawAIResponse(err.rawText);
+        setShowRawModal(true);
+      }
       setError(err instanceof Error ? err.message : '生成题目失败，请重试');
     } finally {
       setIsGenerating(false);
@@ -222,12 +255,6 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {error && (
-          <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm">
-            {error}
-          </div>
-        )}
-
         {isGenerating && (
           <div className="p-4 bg-teal-50 text-teal-700 rounded-xl text-sm flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
@@ -435,6 +462,64 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
                 {generatingMode === characterModal.mode ? '生成中...' : '开始生成'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showRawModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">AI 原始输出</h3>
+                <p className="text-xs text-gray-500">生成失败时可复制这段内容手动修正</p>
+              </div>
+              <button
+                onClick={() => setShowRawModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <textarea
+                value={rawAIResponse}
+                readOnly
+                rows={12}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl font-mono text-xs focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all resize-none"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(rawAIResponse).catch(() => {});
+                  }}
+                  className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors"
+                >
+                  复制内容
+                </button>
+                <button
+                  onClick={() => setShowRawModal(false)}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showErrorToast && error && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw] w-full px-4">
+          <div className="mx-auto max-w-2xl bg-red-600 text-white rounded-xl shadow-lg px-4 py-3 flex items-start gap-3">
+            <span className="text-sm leading-relaxed break-words">{error}</span>
+            <button
+              onClick={() => setShowErrorToast(false)}
+              className="ml-auto p-1 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="关闭错误提示"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
           </div>
         </div>
       )}

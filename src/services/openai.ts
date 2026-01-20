@@ -8,6 +8,16 @@ interface OpenAIConfig {
   model: string;
 }
 
+export class AIResponseParseError extends Error {
+  rawText: string;
+
+  constructor(message: string, rawText: string) {
+    super(message);
+    this.name = 'AIResponseParseError';
+    this.rawText = rawText;
+  }
+}
+
 function getProxyUrl(): string {
   return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-proxy`;
 }
@@ -40,6 +50,22 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
     throw new Error('请先配置 API Key');
   }
 
+  const responseFormat = stream
+    ? undefined
+    : {
+        type: 'json_schema',
+        json_schema: {
+          name: 'json_array',
+          schema: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+      };
+
   const response = await fetch(getProxyUrl(), {
     method: 'POST',
     headers: {
@@ -52,6 +78,7 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
       model: config.model,
       messages,
       stream,
+      ...(responseFormat ? { response_format: responseFormat } : {}),
       temperature: 0.7,
     }),
   });
@@ -62,6 +89,19 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
   }
 
   return response;
+}
+
+function parseJsonArray<T>(resultText: string): T[] {
+  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new AIResponseParseError('AI 返回格式错误，请重试', resultText);
+  }
+
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    throw new AIResponseParseError('AI 返回的 JSON 无法解析，请复制后手动修正', resultText);
+  }
 }
 
 export async function splitArticle(content: string): Promise<CardSplitResult[]> {
@@ -89,13 +129,7 @@ export async function splitArticle(content: string): Promise<CardSplitResult[]> 
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    throw new Error('AI 返回格式错误，请重试');
-  }
-
-  const cards: CardSplitResult[] = JSON.parse(jsonMatch[0]);
-  return cards;
+  return parseJsonArray<CardSplitResult>(resultText);
 }
 
 const questionTypePrompts: Record<string, string> = {
@@ -203,13 +237,7 @@ export async function convertToDialogue(content: string, characters: string): Pr
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    throw new Error('AI 返回格式错误，请重试');
-  }
-
-  const dialogues: DialogueGenerationResult[] = JSON.parse(jsonMatch[0]);
-  return dialogues;
+  return parseJsonArray<DialogueGenerationResult>(resultText);
 }
 
 export async function* answerDialogueQuestion(
@@ -397,13 +425,7 @@ export async function convertToGalgame(content: string, characters: string): Pro
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    throw new Error('AI 返回格式错误，请重试');
-  }
-
-  const dialogues: GalgameGenerationResult[] = JSON.parse(jsonMatch[0]);
-  return dialogues;
+  return parseJsonArray<GalgameGenerationResult>(resultText);
 }
 
 export async function generateQuizQuestions(content: string): Promise<QuizGenerationResult[]> {
@@ -433,11 +455,5 @@ export async function generateQuizQuestions(content: string): Promise<QuizGenera
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    throw new Error('AI 返回格式错误，请重试');
-  }
-
-  const questions: QuizGenerationResult[] = JSON.parse(jsonMatch[0]);
-  return questions;
+  return parseJsonArray<QuizGenerationResult>(resultText);
 }
