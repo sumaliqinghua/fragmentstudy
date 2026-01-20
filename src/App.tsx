@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Home } from './pages/Home';
+import { ArticleHub } from './pages/ArticleHub';
 import { CardReader } from './pages/CardReader';
+import { QuizReader } from './pages/QuizReader';
 import { DialogueReader } from './components/DialogueReader';
 import { GalgameReader } from './components/GalgameReader';
 import { WelcomeModal } from './components/WelcomeModal';
@@ -11,7 +13,11 @@ import type { Article } from './types';
 
 const WELCOME_DISMISSED_KEY = 'welcome_dismissed';
 
-type View = { type: 'home' } | { type: 'reader'; articleId: string };
+type ReaderMode = 'card' | 'dialogue' | 'galgame' | 'quiz';
+type View =
+  | { type: 'home' }
+  | { type: 'article'; articleId: string }
+  | { type: 'reader'; articleId: string; mode: ReaderMode };
 
 function AppContent() {
   const { isLoading: authLoading, isGuest } = useAuth();
@@ -32,19 +38,26 @@ function AppContent() {
   }, [authLoading, isGuest]);
 
   useEffect(() => {
-    if (view.type === 'reader') {
+    if (view.type === 'reader' && view.mode !== 'card' && view.mode !== 'quiz') {
       setIsLoading(true);
       getArticle(view.articleId)
         .then(setArticle)
         .finally(() => setIsLoading(false));
     } else {
       setArticle(null);
+      setIsLoading(false);
     }
   }, [view]);
 
-  const handleBack = () => {
+  const handleBackToHome = () => {
     setView({ type: 'home' });
     setArticle(null);
+  };
+
+  const handleBackToArticle = () => {
+    if (view.type === 'reader') {
+      setView({ type: 'article', articleId: view.articleId });
+    }
   };
 
   const handleWelcomeLogin = () => {
@@ -78,6 +91,13 @@ function AppContent() {
   }
 
   if (view.type === 'reader') {
+    if (view.mode === 'card') {
+      return <CardReader articleId={view.articleId} onBack={handleBackToArticle} />;
+    }
+    if (view.mode === 'quiz') {
+      return <QuizReader articleId={view.articleId} onBack={handleBackToArticle} />;
+    }
+
     if (isLoading || !article) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -89,20 +109,26 @@ function AppContent() {
       );
     }
 
-    if (article.mode === 'dialogue') {
-      return <DialogueReader article={article} onBack={handleBack} />;
+    if (view.mode === 'dialogue') {
+      return <DialogueReader article={article} onBack={handleBackToArticle} />;
     }
 
-    if (article.mode === 'galgame') {
-      return <GalgameReader article={article} onBack={handleBack} />;
-    }
+    return <GalgameReader article={article} onBack={handleBackToArticle} />;
+  }
 
-    return <CardReader articleId={view.articleId} onBack={handleBack} />;
+  if (view.type === 'article') {
+    return (
+      <ArticleHub
+        articleId={view.articleId}
+        onBack={handleBackToHome}
+        onOpenMode={(mode) => setView({ type: 'reader', articleId: view.articleId, mode })}
+      />
+    );
   }
 
   return (
     <>
-      <Home onSelectArticle={(id) => setView({ type: 'reader', articleId: id })} />
+      <Home onSelectArticle={(id) => setView({ type: 'article', articleId: id })} />
       <WelcomeModal
         isOpen={showWelcome}
         onLogin={handleWelcomeLogin}

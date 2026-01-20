@@ -15,6 +15,8 @@ import type {
   GalgameGenerationResult,
   ArticleTextAnnotation,
   ArticleTextQA,
+  QuizQuestion,
+  QuizGenerationResult,
 } from '../types';
 
 const STORAGE_PREFIX = 'guest_';
@@ -120,22 +122,32 @@ function setGalgameMessagesStore(articleId: string, messages: GalgameMessage[]):
   setItem(`galgame_${articleId}`, messages);
 }
 
+function getQuizQuestionsStore(articleId: string): QuizQuestion[] {
+  return getItem<QuizQuestion[]>(`quiz_${articleId}`) || [];
+}
+
+function setQuizQuestionsStore(articleId: string, questions: QuizQuestion[]): void {
+  setItem(`quiz_${articleId}`, questions);
+}
+
 export async function getArticles(): Promise<ArticleWithProgress[]> {
   const articles = getArticlesStore();
   const progressStore = getProgressStore();
 
   return articles.map(article => {
     const progress = progressStore[article.id];
-    if (article.mode === 'dialogue') {
-      const messages = getDialogueMessagesStore(article.id);
-      return { ...article, progress, messageCount: messages.length };
-    } else if (article.mode === 'galgame') {
-      const messages = getGalgameMessagesStore(article.id);
-      return { ...article, progress, galgameMessageCount: messages.length };
-    } else {
-      const cards = getCardsStore(article.id);
-      return { ...article, progress, cardCount: cards.length };
-    }
+    const cards = getCardsStore(article.id);
+    const dialogueMessages = getDialogueMessagesStore(article.id);
+    const galgameMessages = getGalgameMessagesStore(article.id);
+    const quizQuestions = getQuizQuestionsStore(article.id);
+    return {
+      ...article,
+      progress,
+      cardCount: cards.length,
+      messageCount: dialogueMessages.length,
+      galgameMessageCount: galgameMessages.length,
+      quizCount: quizQuestions.length,
+    };
   });
 }
 
@@ -147,7 +159,7 @@ export async function getArticle(id: string): Promise<Article | null> {
 export async function createArticle(
   title: string,
   content: string,
-  mode: ArticleMode = 'card',
+  mode: ArticleMode = 'source',
   characters?: string
 ): Promise<Article> {
   const article: Article = {
@@ -173,6 +185,7 @@ export async function deleteArticle(id: string): Promise<void> {
   localStorage.removeItem(STORAGE_PREFIX + `cards_${id}`);
   localStorage.removeItem(STORAGE_PREFIX + `dialogue_${id}`);
   localStorage.removeItem(STORAGE_PREFIX + `galgame_${id}`);
+  localStorage.removeItem(STORAGE_PREFIX + `quiz_${id}`);
 
   const progressStore = getProgressStore();
   delete progressStore[id];
@@ -472,6 +485,26 @@ export async function upsertCardNote(cardId: string, content: string): Promise<C
 
 export async function getGalgameMessages(articleId: string): Promise<GalgameMessage[]> {
   return getGalgameMessagesStore(articleId);
+}
+
+export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[]> {
+  return getQuizQuestionsStore(articleId);
+}
+
+export async function createQuizQuestions(
+  articleId: string,
+  questions: QuizGenerationResult[]
+): Promise<QuizQuestion[]> {
+  const newQuestions: QuizQuestion[] = questions.map((question, index) => ({
+    ...question,
+    id: generateId(),
+    article_id: articleId,
+    sequence_order: index,
+    created_at: new Date().toISOString(),
+  }));
+
+  setQuizQuestionsStore(articleId, newQuestions);
+  return newQuestions;
 }
 
 export async function createGalgameMessages(

@@ -1,4 +1,4 @@
-export type ArticleMode = 'card' | 'dialogue' | 'galgame';
+export type ArticleMode = 'source' | 'card' | 'dialogue' | 'galgame';
 
 export type ScreenEffect = 'none' | 'shake' | 'flash' | 'pulse';
 export type CharacterPosition = 'left' | 'right' | 'center';
@@ -50,6 +50,7 @@ export interface ArticleWithProgress extends Article {
   cardCount?: number;
   messageCount?: number;
   galgameMessageCount?: number;
+  quizCount?: number;
 }
 
 export interface DialogueMessage {
@@ -174,4 +175,22 @@ export interface ArticleTextQA {
   answer: string;
   include_full_article: boolean;
   created_at: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  article_id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+  sequence_order: number;
+  created_at: string;
+}
+
+export interface QuizGenerationResult {
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
 }

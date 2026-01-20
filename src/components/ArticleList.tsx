@@ -1,4 +1,4 @@
-import { BookOpen, Trash2, Layers, Clock, MessageCircle, Tv } from 'lucide-react';
+import { BookOpen, Trash2, Layers, Clock, MessageCircle, Tv, HelpCircle } from 'lucide-react';
 import type { ArticleWithProgress } from '../types';
 
 interface ArticleListProps {
@@ -24,14 +24,11 @@ export function ArticleList({ articles, onSelect, onDelete }: ArticleListProps) 
     <div className="space-y-3">
       {articles.map((article) => {
         const progress = article.progress;
-        const isDialogue = article.mode === 'dialogue';
-        const isGalgame = article.mode === 'galgame';
-        const itemCount = isDialogue
-          ? article.messageCount
-          : isGalgame
-          ? article.galgameMessageCount
-          : article.cardCount;
-        const progressPercent = progress
+        const cardCount = article.cardCount || 0;
+        const dialogueCount = article.messageCount || 0;
+        const galgameCount = article.galgameMessageCount || 0;
+        const quizCount = article.quizCount || 0;
+        const progressPercent = progress && progress.total_count > 0
           ? Math.round((progress.completed_count / progress.total_count) * 100)
           : 0;
 
@@ -47,28 +44,24 @@ export function ArticleList({ articles, onSelect, onDelete }: ArticleListProps) 
                   <h3 className="font-semibold text-gray-900 truncate group-hover:text-teal-600 transition-colors">
                     {article.title}
                   </h3>
-                  {isDialogue && (
-                    <span className="shrink-0 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
-                      对话
-                    </span>
-                  )}
-                  {isGalgame && (
-                    <span className="shrink-0 px-2 py-0.5 bg-cyan-100 text-cyan-700 text-xs font-medium rounded-full">
-                      视觉小说
-                    </span>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-4 text-sm text-gray-500">
                   <span className="flex items-center gap-1.5">
-                    {isDialogue ? (
-                      <MessageCircle className="w-4 h-4" />
-                    ) : isGalgame ? (
-                      <Tv className="w-4 h-4" />
-                    ) : (
-                      <Layers className="w-4 h-4" />
-                    )}
-                    {itemCount} {isDialogue ? '条对话' : isGalgame ? '句台词' : '张卡片'}
+                    <Layers className="w-4 h-4" />
+                    {cardCount} 张卡片
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <MessageCircle className="w-4 h-4" />
+                    {dialogueCount} 条对话
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Tv className="w-4 h-4" />
+                    {galgameCount} 句台词
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4" />
+                    {quizCount} 道题
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4" />
@@ -76,7 +69,7 @@ export function ArticleList({ articles, onSelect, onDelete }: ArticleListProps) 
                   </span>
                 </div>
 
-                {itemCount && itemCount > 0 && (
+                {cardCount > 0 && progress && (
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="text-gray-500">学习进度</span>

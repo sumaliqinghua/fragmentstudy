@@ -19,6 +19,17 @@ const EMOTION_EMOJIS: Record<string, string> = {
   think: '💭',
   sad: '💔',
 };
+const EMOTION_LABELS: Record<string, string> = {
+  sweat: '紧张',
+  angry: '生气',
+  love: '心动',
+  shock: '震惊',
+  question: '疑问',
+  happy: '开心',
+  think: '思考',
+  sad: '难过',
+};
+type EmotionKey = keyof typeof EMOTION_EMOJIS;
 
 function generateAvatarColor(seed: string): string {
   let hash = 0;
@@ -54,13 +65,39 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const [textSpeed, setTextSpeed] = useState(50);
   const [showSettings, setShowSettings] = useState(false);
   const [showOriginalText, setShowOriginalText] = useState(false);
+  const [showPortraitSettings, setShowPortraitSettings] = useState(false);
+  const [emotionPortraits, setEmotionPortraits] = useState<Record<string, string>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const autoPlayTimerRef = useRef<number | null>(null);
+  const portraitStorageKey = `galgame_emotion_portraits_${article.id}`;
 
   useEffect(() => {
     loadMessages();
   }, [article.id]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(portraitStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Record<string, string>;
+        setEmotionPortraits(parsed);
+      } else {
+        setEmotionPortraits({});
+      }
+    } catch (error) {
+      console.warn('Failed to load emotion portraits:', error);
+      setEmotionPortraits({});
+    }
+  }, [portraitStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(portraitStorageKey, JSON.stringify(emotionPortraits));
+    } catch (error) {
+      console.warn('Failed to save emotion portraits:', error);
+    }
+  }, [emotionPortraits, portraitStorageKey]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -154,6 +191,22 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
     setShowHistory(false);
   };
 
+  const handlePortraitUpload = (emotion: EmotionKey, file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEmotionPortraits(prev => ({ ...prev, [emotion]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePortraitClear = (emotion: EmotionKey) => {
+    setEmotionPortraits(prev => {
+      const next = { ...prev };
+      delete next[emotion];
+      return next;
+    });
+  };
+
   const getScreenEffectClass = () => {
     switch (screenEffect) {
       case 'shake':
@@ -192,6 +245,8 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const currentMessage = messages[currentIndex];
   const avatarColor = generateAvatarColor(currentMessage.avatar_seed);
   const emotionEmoji = currentMessage.emotion_emoji ? EMOTION_EMOJIS[currentMessage.emotion_emoji] : null;
+  const currentEmotion = currentMessage.emotion_emoji as EmotionKey | undefined;
+  const currentPortrait = currentEmotion ? emotionPortraits[currentEmotion] : undefined;
 
   const leftCharacter = currentMessage.position === 'left' || currentMessage.position === 'center' ? currentMessage : null;
   const rightCharacter = currentMessage.position === 'right' ? currentMessage : null;
@@ -294,6 +349,12 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                 <div className={`w-5 h-5 bg-white rounded-full transition-transform ${autoPlay ? 'translate-x-6' : 'translate-x-0.5'}`} />
               </button>
             </div>
+            <button
+              onClick={() => setShowPortraitSettings(true)}
+              className="w-full px-3 py-2 text-sm text-gray-200 bg-gray-700/60 hover:bg-gray-600/80 rounded-lg transition-colors"
+            >
+              情绪立绘
+            </button>
           </div>
         </div>
       )}
@@ -303,14 +364,24 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
           {leftCharacter && (
             <div className="flex flex-col items-center animate-float">
               <div className="relative">
-                {emotionEmoji && currentMessage.position !== 'right' && (
+                {emotionEmoji && !currentPortrait && currentMessage.position !== 'right' && (
                   <div className="absolute -top-4 -right-4 text-3xl animate-bounce z-10">
                     {emotionEmoji}
                   </div>
                 )}
-                <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
-                  {getInitials(leftCharacter.character_name)}
-                </div>
+                {currentPortrait ? (
+                  <div className="w-28 h-40 md:w-36 md:h-52 rounded-2xl bg-black/30 ring-4 ring-white/20 shadow-2xl overflow-hidden">
+                    <img
+                      src={currentPortrait}
+                      alt={`${leftCharacter.character_name}-${currentEmotion}`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
+                    {getInitials(leftCharacter.character_name)}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -318,14 +389,24 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
           {rightCharacter && (
             <div className="flex flex-col items-center animate-float" style={{ animationDelay: '0.5s' }}>
               <div className="relative">
-                {emotionEmoji && (
+                {emotionEmoji && !currentPortrait && (
                   <div className="absolute -top-4 -left-4 text-3xl animate-bounce z-10">
                     {emotionEmoji}
                   </div>
                 )}
-                <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${generateAvatarColor(rightCharacter.avatar_seed)} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
-                  {getInitials(rightCharacter.character_name)}
-                </div>
+                {currentPortrait ? (
+                  <div className="w-28 h-40 md:w-36 md:h-52 rounded-2xl bg-black/30 ring-4 ring-white/20 shadow-2xl overflow-hidden">
+                    <img
+                      src={currentPortrait}
+                      alt={`${rightCharacter.character_name}-${currentEmotion}`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${generateAvatarColor(rightCharacter.avatar_seed)} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
+                    {getInitials(rightCharacter.character_name)}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -412,6 +493,74 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                 <p className="text-gray-300 text-sm line-clamp-2">{msg.content}</p>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {showPortraitSettings && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex flex-col" onClick={() => setShowPortraitSettings(false)}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800" onClick={e => e.stopPropagation()}>
+            <h2 className="text-white font-medium">情绪立绘</h2>
+            <button onClick={() => setShowPortraitSettings(false)} className="p-2 hover:bg-white/10 rounded-full">
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" onClick={e => e.stopPropagation()}>
+            {(Object.keys(EMOTION_EMOJIS) as EmotionKey[]).map((emotion) => {
+              const portrait = emotionPortraits[emotion];
+              return (
+                <div
+                  key={emotion}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/60 border border-gray-700"
+                >
+                  <div className="text-2xl w-10 text-center">{EMOTION_EMOJIS[emotion]}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-white">{EMOTION_LABELS[emotion]}</span>
+                      <span className="text-xs text-gray-500">{emotion}</span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-3">
+                      {portrait ? (
+                        <img
+                          src={portrait}
+                          alt={`${EMOTION_LABELS[emotion]}-portrait`}
+                          className="w-16 h-20 rounded-lg object-contain bg-black/40 border border-gray-700"
+                        />
+                      ) : (
+                        <div className="w-16 h-20 rounded-lg bg-gray-700/60 border border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                          默认
+                        </div>
+                      )}
+                      <label className="px-3 py-1.5 text-xs text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-md cursor-pointer transition-colors">
+                        上传
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) {
+                              return;
+                            }
+                            handlePortraitUpload(emotion, file);
+                            event.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
+                      {portrait && (
+                        <button
+                          onClick={() => handlePortraitClear(emotion)}
+                          className="px-3 py-1.5 text-xs text-gray-300 hover:text-white rounded-md border border-gray-600 hover:border-gray-500 transition-colors"
+                        >
+                          清除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <p className="text-xs text-gray-500">上传后会保存在本地浏览器，切换情绪时自动匹配。</p>
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-import type { CardSplitResult, AIExplanationRequest, DialogueGenerationResult, GalgameGenerationResult } from '../types';
+import type { CardSplitResult, AIExplanationRequest, DialogueGenerationResult, GalgameGenerationResult, QuizGenerationResult } from '../types';
 
 const STORAGE_KEY = 'openai_config';
 
@@ -404,4 +404,40 @@ export async function convertToGalgame(content: string, characters: string): Pro
 
   const dialogues: GalgameGenerationResult[] = JSON.parse(jsonMatch[0]);
   return dialogues;
+}
+
+export async function generateQuizQuestions(content: string): Promise<QuizGenerationResult[]> {
+  const systemPrompt = `你是一个教育测验设计专家。你的任务是根据文章内容生成多道单选题，用于检验学习效果。
+
+要求：
+1. 每题只有一个正确答案
+2. 题干清晰、与文章核心知识点相关
+3. 选项数量固定为 4 个
+4. 选项内容要有一定区分度，避免明显干扰项
+5. 提供简短解析，说明为什么答案正确
+6. 题目数量根据文章长度生成 6-12 题
+
+请以 JSON 数组格式返回，每个元素包含：
+- question: 题干
+- options: 选项数组（长度为 4）
+- correct_index: 正确选项索引（0-3）
+- explanation: 简短解析
+
+只返回 JSON 数组，不要其他内容。`;
+
+  const response = await callOpenAI([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `请基于以下文章生成单选题：\n\n${content}` },
+  ]);
+
+  const data = await response.json();
+  const resultText = data.choices[0]?.message?.content || '[]';
+
+  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error('AI 返回格式错误，请重试');
+  }
+
+  const questions: QuizGenerationResult[] = JSON.parse(jsonMatch[0]);
+  return questions;
 }

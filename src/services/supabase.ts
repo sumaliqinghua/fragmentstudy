@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Article, Card, LearningProgress, Reward, ArticleWithProgress, AIConversation, Highlight, DialogueMessage, DialogueQA, DialogueGenerationResult, ArticleMode, CardNote, GalgameMessage, GalgameGenerationResult } from '../types';
+import type { Article, Card, LearningProgress, Reward, ArticleWithProgress, AIConversation, Highlight, DialogueMessage, DialogueQA, DialogueGenerationResult, ArticleMode, CardNote, GalgameMessage, GalgameGenerationResult, QuizQuestion, QuizGenerationResult } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -24,40 +24,33 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
       .eq('article_id', article.id)
       .maybeSingle();
 
-    if (article.mode === 'dialogue') {
-      const { count } = await supabase
-        .from('dialogue_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id);
-
-      articlesWithProgress.push({
-        ...article,
-        progress: progress || undefined,
-        messageCount: count || 0,
-      });
-    } else if (article.mode === 'galgame') {
-      const { count } = await supabase
-        .from('galgame_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id);
-
-      articlesWithProgress.push({
-        ...article,
-        progress: progress || undefined,
-        galgameMessageCount: count || 0,
-      });
-    } else {
-      const { count } = await supabase
+    const [{ count: cardCount }, { count: messageCount }, { count: galgameMessageCount }, { count: quizCount }] = await Promise.all([
+      supabase
         .from('cards')
         .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id);
+        .eq('article_id', article.id),
+      supabase
+        .from('dialogue_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('article_id', article.id),
+      supabase
+        .from('galgame_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('article_id', article.id),
+      supabase
+        .from('quiz_questions')
+        .select('*', { count: 'exact', head: true })
+        .eq('article_id', article.id),
+    ]);
 
-      articlesWithProgress.push({
-        ...article,
-        progress: progress || undefined,
-        cardCount: count || 0,
-      });
-    }
+    articlesWithProgress.push({
+      ...article,
+      progress: progress || undefined,
+      cardCount: cardCount || 0,
+      messageCount: messageCount || 0,
+      galgameMessageCount: galgameMessageCount || 0,
+      quizCount: quizCount || 0,
+    });
   }
 
   return articlesWithProgress;
@@ -77,7 +70,7 @@ export async function getArticle(id: string): Promise<Article | null> {
 export async function createArticle(
   title: string,
   content: string,
-  mode: ArticleMode = 'card',
+  mode: ArticleMode = 'source',
   characters?: string
 ): Promise<Article> {
   const { data, error } = await supabase
@@ -492,6 +485,17 @@ export async function getGalgameMessages(articleId: string): Promise<GalgameMess
   return data || [];
 }
 
+export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[]> {
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .select('*')
+    .eq('article_id', articleId)
+    .order('sequence_order', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function createGalgameMessages(
   articleId: string,
   messages: GalgameGenerationResult[]
@@ -511,6 +515,25 @@ export async function createGalgameMessages(
   const { data, error } = await supabase
     .from('galgame_messages')
     .insert(messagesToInsert)
+    .select();
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createQuizQuestions(
+  articleId: string,
+  questions: QuizGenerationResult[]
+): Promise<QuizQuestion[]> {
+  const questionsToInsert = questions.map((question, index) => ({
+    ...question,
+    article_id: articleId,
+    sequence_order: index,
+  }));
+
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .insert(questionsToInsert)
     .select();
 
   if (error) throw error;
