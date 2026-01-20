@@ -92,15 +92,16 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
 }
 
 function parseJsonArray<T>(resultText: string): T[] {
-  const jsonMatch = resultText.match(/\[[\s\S]*\]/);
+  const cleanedText = resultText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
-    throw new AIResponseParseError('AI 返回格式错误，请重试', resultText);
+    throw new AIResponseParseError('AI 返回格式错误，请重试', cleanedText || resultText);
   }
 
   try {
     return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    throw new AIResponseParseError('AI 返回的 JSON 无法解析，请复制后手动修正', resultText);
+    throw new AIResponseParseError('AI 返回的 JSON 无法解析，请复制后手动修正', cleanedText || resultText);
   }
 }
 
@@ -222,7 +223,6 @@ export async function convertToDialogue(content: string, characters: string): Pr
 
 请以 JSON 数组格式返回，每个元素包含：
 - character_name: 角色名称
-- avatar_seed: 角色名称（用于生成头像）
 - content: 对话内容
 - is_right_side: 是否显示在右侧（学习者/提问者为 true，讲解者为 false）
 - knowledge_point: 这段对话涉及的知识点简述（可选）
@@ -395,12 +395,6 @@ export async function convertToGalgame(content: string, characters: string): Pro
 - 思考: "think" (对应 emoji 💭)
 - 悲伤: "sad" (对应 emoji 💔)
 
-屏幕特效可选值：
-- "none" - 无特效（默认）
-- "shake" - 屏幕震动（惊讶、愤怒、重要发现时使用）
-- "flash" - 屏幕闪白（恍然大悟、重要信息时使用）
-- "pulse" - 脉冲效果（强调、心跳加速时使用）
-
 角色位置：
 - "left" - 左侧（通常是讲解者/主角）
 - "right" - 右侧（通常是学习者/配角）
@@ -408,10 +402,8 @@ export async function convertToGalgame(content: string, characters: string): Pro
 
 请以 JSON 数组格式返回，每个元素包含：
 - character_name: 角色名称
-- avatar_seed: 角色名称（用于生成头像颜色）
 - content: 对话内容（简短有力）
 - emotion_emoji: 情绪 emoji 标识（可选，从上述列表选择）
-- screen_effect: 屏幕特效（默认 "none"）
 - knowledge_point: 这段对话涉及的知识点简述（可选）
 - position: 角色位置（left/right/center）
 

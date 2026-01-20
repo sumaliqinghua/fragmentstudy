@@ -77,7 +77,7 @@ export interface DialogueQA {
 
 export interface DialogueGenerationResult {
   character_name: string;
-  avatar_seed: string;
+  avatar_seed?: string;
   content: string;
   is_right_side: boolean;
   knowledge_point?: string;
@@ -140,7 +140,7 @@ export interface GalgameMessage {
 
 export interface GalgameGenerationResult {
   character_name: string;
-  avatar_seed: string;
+  avatar_seed?: string;
   content: string;
   emotion_emoji?: string;
   screen_effect?: ScreenEffect;

@@ -67,10 +67,15 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const [showOriginalText, setShowOriginalText] = useState(false);
   const [showPortraitSettings, setShowPortraitSettings] = useState(false);
   const [emotionPortraits, setEmotionPortraits] = useState<Record<string, string>>({});
+  const [showCharacterPortraitSettings, setShowCharacterPortraitSettings] = useState(false);
+  const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
+  const [portraitWidth, setPortraitWidth] = useState(120);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const autoPlayTimerRef = useRef<number | null>(null);
   const portraitStorageKey = `galgame_emotion_portraits_${article.id}`;
+  const characterPortraitStorageKey = `galgame_character_portraits_${article.id}`;
+  const portraitWidthStorageKey = `galgame_portrait_width_${article.id}`;
 
   useEffect(() => {
     loadMessages();
@@ -93,11 +98,56 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
 
   useEffect(() => {
     try {
+      const stored = localStorage.getItem(portraitWidthStorageKey);
+      if (stored) {
+        const parsed = Number(stored);
+        if (!Number.isNaN(parsed)) {
+          setPortraitWidth(parsed);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load portrait width:', error);
+    }
+  }, [portraitWidthStorageKey]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(characterPortraitStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Record<string, string>;
+        setCharacterPortraits(parsed);
+      } else {
+        setCharacterPortraits({});
+      }
+    } catch (error) {
+      console.warn('Failed to load character portraits:', error);
+      setCharacterPortraits({});
+    }
+  }, [characterPortraitStorageKey]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(portraitStorageKey, JSON.stringify(emotionPortraits));
     } catch (error) {
       console.warn('Failed to save emotion portraits:', error);
     }
   }, [emotionPortraits, portraitStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(characterPortraitStorageKey, JSON.stringify(characterPortraits));
+    } catch (error) {
+      console.warn('Failed to save character portraits:', error);
+    }
+  }, [characterPortraits, characterPortraitStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(portraitWidthStorageKey, String(portraitWidth));
+    } catch (error) {
+      console.warn('Failed to save portrait width:', error);
+    }
+  }, [portraitWidth, portraitWidthStorageKey]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -207,6 +257,22 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
     });
   };
 
+  const handleCharacterPortraitUpload = (characterName: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCharacterPortraits(prev => ({ ...prev, [characterName]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCharacterPortraitClear = (characterName: string) => {
+    setCharacterPortraits(prev => {
+      const next = { ...prev };
+      delete next[characterName];
+      return next;
+    });
+  };
+
   const getScreenEffectClass = () => {
     switch (screenEffect) {
       case 'shake':
@@ -246,10 +312,12 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const avatarColor = generateAvatarColor(currentMessage.avatar_seed);
   const emotionEmoji = currentMessage.emotion_emoji ? EMOTION_EMOJIS[currentMessage.emotion_emoji] : null;
   const currentEmotion = currentMessage.emotion_emoji as EmotionKey | undefined;
-  const currentPortrait = currentEmotion ? emotionPortraits[currentEmotion] : undefined;
+  const currentEmotionPortrait = currentEmotion ? emotionPortraits[currentEmotion] : undefined;
 
   const leftCharacter = currentMessage.position === 'left' || currentMessage.position === 'center' ? currentMessage : null;
   const rightCharacter = currentMessage.position === 'right' ? currentMessage : null;
+  const characterNames = Array.from(new Set(messages.map(msg => msg.character_name)));
+  const portraitHeight = Math.round(portraitWidth * 1.45);
 
   return (
     <div
@@ -340,6 +408,21 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                 <span>快</span>
               </div>
             </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">立绘宽度</label>
+              <input
+                type="range"
+                min="60"
+                max="320"
+                value={portraitWidth}
+                onChange={(e) => setPortraitWidth(parseInt(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>窄</span>
+                <span>宽</span>
+              </div>
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-400">自动播放</span>
               <button
@@ -355,25 +438,44 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
             >
               情绪立绘
             </button>
+            <button
+              onClick={() => setShowCharacterPortraitSettings(true)}
+              className="w-full px-3 py-2 text-sm text-gray-200 bg-gray-700/60 hover:bg-gray-600/80 rounded-lg transition-colors"
+            >
+              人物立绘
+            </button>
           </div>
         </div>
       )}
 
-      <div className="flex-1 flex items-end justify-center pb-48 pt-20 px-4">
+      <div className="flex-1 flex items-end justify-center pb-64 pt-20 px-4">
         <div className="flex items-end justify-center gap-8 w-full max-w-4xl">
           {leftCharacter && (
             <div className="flex flex-col items-center animate-float">
               <div className="relative">
-                {emotionEmoji && !currentPortrait && currentMessage.position !== 'right' && (
-                  <div className="absolute -top-4 -right-4 text-3xl animate-bounce z-10">
-                    {emotionEmoji}
-                  </div>
-                )}
-                {currentPortrait ? (
-                  <div className="w-28 h-40 md:w-36 md:h-52 rounded-2xl bg-black/30 ring-4 ring-white/20 shadow-2xl overflow-hidden">
+                {currentEmotionPortrait ? (
+                  <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10">
                     <img
-                      src={currentPortrait}
+                      src={currentEmotionPortrait}
                       alt={`${leftCharacter.character_name}-${currentEmotion}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  emotionEmoji && currentMessage.position !== 'right' && (
+                    <div className="absolute -top-4 -right-4 text-3xl animate-bounce z-10">
+                      {emotionEmoji}
+                    </div>
+                  )
+                )}
+                {characterPortraits[leftCharacter.character_name] ? (
+                  <div
+                    className="rounded-2xl shadow-2xl overflow-hidden"
+                    style={{ width: portraitWidth, height: portraitHeight }}
+                  >
+                    <img
+                      src={characterPortraits[leftCharacter.character_name]}
+                      alt={`${leftCharacter.character_name}-portrait`}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -389,16 +491,29 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
           {rightCharacter && (
             <div className="flex flex-col items-center animate-float" style={{ animationDelay: '0.5s' }}>
               <div className="relative">
-                {emotionEmoji && !currentPortrait && (
-                  <div className="absolute -top-4 -left-4 text-3xl animate-bounce z-10">
-                    {emotionEmoji}
-                  </div>
-                )}
-                {currentPortrait ? (
-                  <div className="w-28 h-40 md:w-36 md:h-52 rounded-2xl bg-black/30 ring-4 ring-white/20 shadow-2xl overflow-hidden">
+                {currentEmotionPortrait ? (
+                  <div className="absolute -top-2 -left-2 w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10">
                     <img
-                      src={currentPortrait}
+                      src={currentEmotionPortrait}
                       alt={`${rightCharacter.character_name}-${currentEmotion}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  emotionEmoji && (
+                    <div className="absolute -top-4 -left-4 text-3xl animate-bounce z-10">
+                      {emotionEmoji}
+                    </div>
+                  )
+                )}
+                {characterPortraits[rightCharacter.character_name] ? (
+                  <div
+                    className="rounded-2xl shadow-2xl overflow-hidden"
+                    style={{ width: portraitWidth, height: portraitHeight }}
+                  >
+                    <img
+                      src={characterPortraits[rightCharacter.character_name]}
+                      alt={`${rightCharacter.character_name}-portrait`}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -560,7 +675,74 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                 </div>
               );
             })}
-            <p className="text-xs text-gray-500">上传后会保存在本地浏览器，切换情绪时自动匹配。</p>
+            <p className="text-xs text-gray-500">情绪立绘只替换表情显示，保存在本地浏览器。</p>
+          </div>
+        </div>
+      )}
+
+      {showCharacterPortraitSettings && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex flex-col" onClick={() => setShowCharacterPortraitSettings(false)}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800" onClick={e => e.stopPropagation()}>
+            <h2 className="text-white font-medium">人物立绘</h2>
+            <button onClick={() => setShowCharacterPortraitSettings(false)} className="p-2 hover:bg-white/10 rounded-full">
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" onClick={e => e.stopPropagation()}>
+            {characterNames.map((name) => {
+              const portrait = characterPortraits[name];
+              return (
+                <div
+                  key={name}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/60 border border-gray-700"
+                >
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${generateAvatarColor(name)} flex items-center justify-center text-white text-lg font-bold`}>
+                    {getInitials(name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white">{name}</div>
+                    <div className="mt-2 flex items-center gap-3">
+                      {portrait ? (
+                        <img
+                          src={portrait}
+                          alt={`${name}-portrait`}
+                          className="w-16 h-20 rounded-lg object-contain bg-black/40 border border-gray-700"
+                        />
+                      ) : (
+                        <div className="w-16 h-20 rounded-lg bg-gray-700/60 border border-gray-600 flex items-center justify-center text-xs text-gray-400">
+                          默认
+                        </div>
+                      )}
+                      <label className="px-3 py-1.5 text-xs text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-md cursor-pointer transition-colors">
+                        上传
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) {
+                              return;
+                            }
+                            handleCharacterPortraitUpload(name, file);
+                            event.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
+                      {portrait && (
+                        <button
+                          onClick={() => handleCharacterPortraitClear(name)}
+                          className="px-3 py-1.5 text-xs text-gray-300 hover:text-white rounded-md border border-gray-600 hover:border-gray-500 transition-colors"
+                        >
+                          清除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <p className="text-xs text-gray-500">人物立绘只保存在本地浏览器，不会上传到云端。</p>
           </div>
         </div>
       )}
