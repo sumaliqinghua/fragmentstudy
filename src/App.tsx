@@ -8,7 +8,7 @@ import { GalgameReader } from './components/GalgameReader';
 import { WelcomeModal } from './components/WelcomeModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { getArticle } from './services/dataService';
+import { getArticle, getArticlesCacheSnapshot } from './services/dataService';
 import type { Article } from './types';
 
 const WELCOME_DISMISSED_KEY = 'welcome_dismissed';
@@ -39,7 +39,13 @@ function AppContent() {
 
   useEffect(() => {
     if (view.type === 'reader' && view.mode !== 'card' && view.mode !== 'quiz') {
-      setIsLoading(true);
+      const cachedArticle = getArticlesCacheSnapshot()?.find((item) => item.id === view.articleId) || null;
+      if (cachedArticle) {
+        setArticle(cachedArticle);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
       getArticle(view.articleId)
         .then(setArticle)
         .finally(() => setIsLoading(false));

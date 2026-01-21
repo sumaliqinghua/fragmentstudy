@@ -69,13 +69,19 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const [emotionPortraits, setEmotionPortraits] = useState<Record<string, string>>({});
   const [showCharacterPortraitSettings, setShowCharacterPortraitSettings] = useState(false);
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
-  const [portraitWidth, setPortraitWidth] = useState(120);
+  const [portraitWidth, setPortraitWidth] = useState(320);
+  const [displayMode, setDisplayMode] = useState<'stage' | 'bubble'>('stage');
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [dialogueBarHeight, setDialogueBarHeight] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const dialogueBarRef = useRef<HTMLDivElement>(null);
   const autoPlayTimerRef = useRef<number | null>(null);
   const portraitStorageKey = `galgame_emotion_portraits_${article.id}`;
   const characterPortraitStorageKey = `galgame_character_portraits_${article.id}`;
   const portraitWidthStorageKey = `galgame_portrait_width_${article.id}`;
+  const displayModeStorageKey = `galgame_display_mode_${article.id}`;
+  const backgroundStorageKey = `galgame_background_${article.id}`;
 
   useEffect(() => {
     loadMessages();
@@ -109,6 +115,28 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
       console.warn('Failed to load portrait width:', error);
     }
   }, [portraitWidthStorageKey]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(displayModeStorageKey);
+      if (stored === 'stage' || stored === 'bubble') {
+        setDisplayMode(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to load display mode:', error);
+    }
+  }, [displayModeStorageKey]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(backgroundStorageKey);
+      if (stored) {
+        setBackgroundImage(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to load background image:', error);
+    }
+  }, [backgroundStorageKey]);
 
   useEffect(() => {
     try {
@@ -148,6 +176,38 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
       console.warn('Failed to save portrait width:', error);
     }
   }, [portraitWidth, portraitWidthStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(displayModeStorageKey, displayMode);
+    } catch (error) {
+      console.warn('Failed to save display mode:', error);
+    }
+  }, [displayMode, displayModeStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (backgroundImage) {
+        localStorage.setItem(backgroundStorageKey, backgroundImage);
+      } else {
+        localStorage.removeItem(backgroundStorageKey);
+      }
+    } catch (error) {
+      console.warn('Failed to save background image:', error);
+    }
+  }, [backgroundImage, backgroundStorageKey]);
+
+  useEffect(() => {
+    if (!dialogueBarRef.current) {
+      return;
+    }
+    const node = dialogueBarRef.current;
+    const updateHeight = () => setDialogueBarHeight(node.getBoundingClientRect().height);
+    updateHeight();
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -273,6 +333,14 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
     });
   };
 
+  const handleBackgroundUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBackgroundImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getScreenEffectClass = () => {
     switch (screenEffect) {
       case 'shake':
@@ -318,13 +386,31 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const rightCharacter = currentMessage.position === 'right' ? currentMessage : null;
   const characterNames = Array.from(new Set(messages.map(msg => msg.character_name)));
   const portraitHeight = Math.round(portraitWidth * 1.45);
+  const portraitAreaPadding = Math.max(160, dialogueBarHeight + 8);
+  const isBubbleMode = displayMode === 'bubble';
+  const bubbleSide = currentMessage.position === 'right'
+    ? 'right'
+    : currentMessage.position === 'left'
+      ? 'left'
+      : currentIndex % 2 === 0
+        ? 'left'
+        : 'right';
 
   return (
     <div
       ref={containerRef}
-      className={`min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col relative overflow-hidden ${getScreenEffectClass()}`}
+      className={`h-screen bg-gray-900 flex flex-col relative overflow-hidden ${getScreenEffectClass()}`}
       onClick={handleClick}
     >
+      <div className="absolute inset-0 pointer-events-none">
+        {backgroundImage ? (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${backgroundImage})` }}
+          />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-black/10" />
+      </div>
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -413,7 +499,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
               <input
                 type="range"
                 min="60"
-                max="320"
+                max="580"
                 value={portraitWidth}
                 onChange={(e) => setPortraitWidth(parseInt(e.target.value))}
                 className="w-full"
@@ -444,142 +530,279 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
             >
               人物立绘
             </button>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">显示形式</span>
+              <button
+                onClick={() => setDisplayMode(displayMode === 'stage' ? 'bubble' : 'stage')}
+                className={`w-16 h-7 rounded-full transition-colors ${displayMode === 'bubble' ? 'bg-teal-500' : 'bg-gray-600'}`}
+              >
+                <div className={`w-6 h-6 bg-white rounded-full transition-transform ${displayMode === 'bubble' ? 'translate-x-9' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-gray-400">背景图</span>
+              <div className="flex items-center gap-2">
+                <label className="px-3 py-1.5 text-xs text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-md cursor-pointer transition-colors">
+                  上传
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) {
+                        return;
+                      }
+                      handleBackgroundUpload(file);
+                      event.currentTarget.value = '';
+                    }}
+                  />
+                </label>
+                {backgroundImage && (
+                  <button
+                    onClick={() => setBackgroundImage(null)}
+                    className="px-3 py-1.5 text-xs text-gray-300 hover:text-white rounded-md border border-gray-600 hover:border-gray-500 transition-colors"
+                  >
+                    清除
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="flex-1 flex items-end justify-center pb-64 pt-20 px-4">
-        <div className="flex items-end justify-center gap-8 w-full max-w-4xl">
-          {leftCharacter && (
-            <div className="flex flex-col items-center animate-float">
-              <div className="relative">
-                {currentEmotionPortrait ? (
-                  <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10">
-                    <img
-                      src={currentEmotionPortrait}
-                      alt={`${leftCharacter.character_name}-${currentEmotion}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  emotionEmoji && currentMessage.position !== 'right' && (
-                    <div className="absolute -top-4 -right-4 text-3xl animate-bounce z-10">
-                      {emotionEmoji}
+      <div className="relative z-10 flex-1 flex items-end justify-center pt-20 px-4" style={{ paddingBottom: portraitAreaPadding }}>
+        {!isBubbleMode && (
+          <div className="flex items-end justify-center gap-8 w-full max-w-4xl">
+            {leftCharacter && (
+              <div className="flex flex-col items-center animate-float">
+                <div className="relative">
+                  {currentEmotionPortrait ? (
+                    <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10">
+                      <img
+                        src={currentEmotionPortrait}
+                        alt={`${leftCharacter.character_name}-${currentEmotion}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  )
-                )}
-                {characterPortraits[leftCharacter.character_name] ? (
-                  <div
-                    className="rounded-2xl shadow-2xl overflow-hidden"
-                    style={{ width: portraitWidth, height: portraitHeight }}
-                  >
-                    <img
-                      src={characterPortraits[leftCharacter.character_name]}
-                      alt={`${leftCharacter.character_name}-portrait`}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
-                    {getInitials(leftCharacter.character_name)}
-                  </div>
-                )}
+                  ) : (
+                    emotionEmoji && currentMessage.position !== 'right' && (
+                      <div className="absolute -top-4 -right-4 text-3xl animate-bounce z-10">
+                        {emotionEmoji}
+                      </div>
+                    )
+                  )}
+                  {characterPortraits[leftCharacter.character_name] ? (
+                    <div
+                      className="rounded-2xl shadow-2xl overflow-hidden"
+                      style={{ width: portraitWidth, height: portraitHeight }}
+                    >
+                      <img
+                        src={characterPortraits[leftCharacter.character_name]}
+                        alt={`${leftCharacter.character_name}-portrait`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
+                      {getInitials(leftCharacter.character_name)}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {rightCharacter && (
-            <div className="flex flex-col items-center animate-float" style={{ animationDelay: '0.5s' }}>
-              <div className="relative">
-                {currentEmotionPortrait ? (
-                  <div className="absolute -top-2 -left-2 w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10">
-                    <img
-                      src={currentEmotionPortrait}
-                      alt={`${rightCharacter.character_name}-${currentEmotion}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  emotionEmoji && (
-                    <div className="absolute -top-4 -left-4 text-3xl animate-bounce z-10">
-                      {emotionEmoji}
+            {rightCharacter && (
+              <div className="flex flex-col items-center animate-float" style={{ animationDelay: '0.5s' }}>
+                <div className="relative">
+                  {currentEmotionPortrait ? (
+                    <div className="absolute -top-2 -left-2 w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10">
+                      <img
+                        src={currentEmotionPortrait}
+                        alt={`${rightCharacter.character_name}-${currentEmotion}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  )
-                )}
-                {characterPortraits[rightCharacter.character_name] ? (
-                  <div
-                    className="rounded-2xl shadow-2xl overflow-hidden"
-                    style={{ width: portraitWidth, height: portraitHeight }}
-                  >
-                    <img
-                      src={characterPortraits[rightCharacter.character_name]}
-                      alt={`${rightCharacter.character_name}-portrait`}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${generateAvatarColor(rightCharacter.avatar_seed)} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
-                    {getInitials(rightCharacter.character_name)}
-                  </div>
-                )}
+                  ) : (
+                    emotionEmoji && (
+                      <div className="absolute -top-4 -left-4 text-3xl animate-bounce z-10">
+                        {emotionEmoji}
+                      </div>
+                    )
+                  )}
+                  {characterPortraits[rightCharacter.character_name] ? (
+                    <div
+                      className="rounded-2xl shadow-2xl overflow-hidden"
+                      style={{ width: portraitWidth, height: portraitHeight }}
+                    >
+                      <img
+                        src={characterPortraits[rightCharacter.character_name]}
+                        alt={`${rightCharacter.character_name}-portrait`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${generateAvatarColor(rightCharacter.avatar_seed)} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
+                      {getInitials(rightCharacter.character_name)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isBubbleMode && (
+          <div className={`w-full max-w-4xl flex items-center ${bubbleSide === 'right' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex items-center gap-4 ${bubbleSide === 'right' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  {currentEmotionPortrait ? (
+                    <div className={`absolute -top-2 ${bubbleSide === 'right' ? '-left-2' : '-right-2'} w-10 h-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden z-10`}>
+                      <img
+                        src={currentEmotionPortrait}
+                        alt={`${currentMessage.character_name}-${currentEmotion}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    emotionEmoji && (
+                      <div className={`absolute -top-4 ${bubbleSide === 'right' ? '-left-4' : '-right-4'} text-3xl animate-bounce z-10`}>
+                        {emotionEmoji}
+                      </div>
+                    )
+                  )}
+                  {characterPortraits[currentMessage.character_name] ? (
+                    <div
+                      className="rounded-2xl shadow-2xl overflow-hidden"
+                      style={{ width: portraitWidth, height: portraitHeight }}
+                    >
+                      <img
+                        src={characterPortraits[currentMessage.character_name]}
+                        alt={`${currentMessage.character_name}-portrait`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className={`w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-3xl md:text-4xl font-bold shadow-2xl ring-4 ring-white/20`}>
+                      {getInitials(currentMessage.character_name)}
+                    </div>
+                  )}
+                </div>
+                <span className="mt-2 text-xs text-teal-300">{currentMessage.character_name}</span>
+              </div>
+              <div className="relative w-[320px] max-w-[70vw]">
+                <div className={`absolute top-1/2 ${bubbleSide === 'right' ? 'right-[-6px]' : 'left-[-6px]'} w-3 h-3 -translate-y-1/2 bg-white/15 rotate-45 border ${bubbleSide === 'right' ? 'border-r border-b' : 'border-l border-b'} border-white/10`} />
+                <div className="rounded-2xl bg-white/15 border border-white/15 px-5 py-4 text-white backdrop-blur-sm shadow-xl">
+                  {currentMessage.knowledge_point && (
+                    <span className="inline-block mb-2 text-xs text-teal-200 bg-black/30 px-2 py-1 rounded">
+                      {currentMessage.knowledge_point}
+                    </span>
+                  )}
+                  <p className="text-base leading-relaxed">
+                    {displayedText}
+                    {isTyping && <span className="inline-block w-0.5 h-5 bg-white ml-1 animate-blink" />}
+                  </p>
+                </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/95 to-black/80 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-sm font-bold`}>
-              {getInitials(currentMessage.character_name)}
-            </div>
-            <span className="text-teal-400 font-medium">{currentMessage.character_name}</span>
-            {currentMessage.knowledge_point && (
-              <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
-                {currentMessage.knowledge_point}
-              </span>
-            )}
-          </div>
-
-          <div className="min-h-[80px] flex items-start">
-            <p className="text-white text-lg leading-relaxed">
-              {displayedText}
-              {isTyping && <span className="inline-block w-0.5 h-5 bg-white ml-1 animate-blink" />}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
-            <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={handlePrevious}
-                disabled={currentIndex === 0}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                上一句
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={currentIndex === messages.length - 1}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                下一句
-              </button>
-            </div>
-
-            {!isTyping && currentIndex < messages.length - 1 && (
-              <div className="flex items-center gap-2 text-gray-500 text-sm">
-                <span>点击继续</span>
-                <ChevronDown className="w-4 h-4 animate-bounce" />
+      {!isBubbleMode && (
+        <div
+          ref={dialogueBarRef}
+          className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-black/80 backdrop-blur-sm"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="max-w-4xl mx-auto px-4 py-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-sm font-bold`}>
+                {getInitials(currentMessage.character_name)}
               </div>
-            )}
+              <span className="text-teal-400 font-medium">{currentMessage.character_name}</span>
+              {currentMessage.knowledge_point && (
+                <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
+                  {currentMessage.knowledge_point}
+                </span>
+              )}
+            </div>
 
-            {currentIndex === messages.length - 1 && !isTyping && (
-              <span className="text-teal-400 text-sm">已到结尾</span>
-            )}
+            <div className="min-h-[80px] flex items-start">
+              <p className="text-white text-lg leading-relaxed">
+                {displayedText}
+                {isTyping && <span className="inline-block w-0.5 h-5 bg-white ml-1 animate-blink" />}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
+              <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={handlePrevious}
+                  disabled={currentIndex === 0}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  上一句
+                </button>
+                <button
+                  onClick={handleNext}
+                  disabled={currentIndex === messages.length - 1}
+                  className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  下一句
+                </button>
+              </div>
+
+              {!isTyping && currentIndex < messages.length - 1 && (
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>点击继续</span>
+                  <ChevronDown className="w-4 h-4 animate-bounce" />
+                </div>
+              )}
+
+              {currentIndex === messages.length - 1 && !isTyping && (
+                <span className="text-teal-400 text-sm">已到结尾</span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {isBubbleMode && (
+        <div
+          ref={dialogueBarRef}
+          className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-2 flex items-center justify-between text-xs text-gray-400"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrevious}
+              disabled={currentIndex === 0}
+              className="px-3 py-1.5 rounded-full border border-white/10 hover:border-white/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              上一句
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={currentIndex === messages.length - 1}
+              className="px-3 py-1.5 rounded-full border border-white/10 hover:border-white/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              下一句
+            </button>
+          </div>
+          {!isTyping && currentIndex < messages.length - 1 && (
+            <div className="flex items-center gap-2">
+              <span>点击继续</span>
+              <ChevronDown className="w-4 h-4 animate-bounce" />
+            </div>
+          )}
+          {currentIndex === messages.length - 1 && !isTyping && (
+            <span className="text-teal-300">已到结尾</span>
+          )}
+        </div>
+      )}
 
       {showHistory && (
         <div className="fixed inset-0 bg-black/80 z-50 flex flex-col" onClick={() => setShowHistory(false)}>

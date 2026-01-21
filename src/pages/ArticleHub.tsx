@@ -10,6 +10,7 @@ import {
   getDialogueMessages,
   getGalgameMessages,
   getQuizQuestions,
+  getArticlesCacheSnapshot,
 } from '../services/dataService';
 import { AIResponseParseError, convertToDialogue, convertToGalgame, generateQuizQuestions, isConfigured, splitArticle } from '../services/openai';
 import { OriginalTextView } from '../components/OriginalTextView';
@@ -29,12 +30,14 @@ interface ArticleHubProps {
 }
 
 export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
-  const [article, setArticle] = useState<Article | null>(null);
-  const [cardCount, setCardCount] = useState(0);
-  const [dialogueCount, setDialogueCount] = useState(0);
-  const [galgameCount, setGalgameCount] = useState(0);
-  const [quizCount, setQuizCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedArticles = getArticlesCacheSnapshot();
+  const cachedArticle = cachedArticles?.find((item) => item.id === articleId) || null;
+  const [article, setArticle] = useState<Article | null>(cachedArticle);
+  const [cardCount, setCardCount] = useState(cachedArticle?.cardCount || 0);
+  const [dialogueCount, setDialogueCount] = useState(cachedArticle?.messageCount || 0);
+  const [galgameCount, setGalgameCount] = useState(cachedArticle?.galgameMessageCount || 0);
+  const [quizCount, setQuizCount] = useState(cachedArticle?.quizCount || 0);
+  const [isLoading, setIsLoading] = useState(!cachedArticle);
   const [showOriginal, setShowOriginal] = useState(false);
   const [error, setError] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -48,7 +51,9 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
   const toastTimerRef = useRef<number | null>(null);
 
   const loadArticle = async () => {
-    setIsLoading(true);
+    if (!cachedArticle) {
+      setIsLoading(true);
+    }
     try {
       const data = await getArticle(articleId);
       setArticle(data);
@@ -57,7 +62,9 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
       console.error('Failed to load article:', err);
       setError('文章加载失败，请稍后重试');
     } finally {
-      setIsLoading(false);
+      if (!cachedArticle) {
+        setIsLoading(false);
+      }
     }
   };
 
