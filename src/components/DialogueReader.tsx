@@ -5,6 +5,7 @@ import { getDialogueMessages, getDialogueQAs, saveDialogueQA, upsertProgress } f
 import { answerDialogueQuestion } from '../services/openai';
 import { isConfigured } from '../services/openai';
 import { OriginalTextView } from './OriginalTextView';
+import { idbGet } from '../services/localAssetStore';
 
 interface DialogueReaderProps {
   article: Article;
@@ -39,12 +40,45 @@ export function DialogueReader({ article, onBack }: DialogueReaderProps) {
   const [longPressTimer, setLongPressTimer] = useState<number | null>(null);
   const [pressedMessageId, setPressedMessageId] = useState<string | null>(null);
   const [showOriginalText, setShowOriginalText] = useState(false);
+  const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const qaPanelRef = useRef<HTMLDivElement>(null);
+  const characterPortraitStorageKey = 'galgame_character_portraits_global';
 
   useEffect(() => {
     loadData();
   }, [article.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPortraits = async () => {
+      try {
+        const stored = localStorage.getItem(characterPortraitStorageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as Record<string, string>;
+          if (!cancelled) {
+            setCharacterPortraits(parsed);
+          }
+          return;
+        }
+        const idbStored = await idbGet(characterPortraitStorageKey);
+        if (idbStored && !cancelled) {
+          setCharacterPortraits(JSON.parse(idbStored) as Record<string, string>);
+        } else if (!cancelled) {
+          setCharacterPortraits({});
+        }
+      } catch (error) {
+        console.warn('Failed to load character portraits:', error);
+        if (!cancelled) {
+          setCharacterPortraits({});
+        }
+      }
+    };
+    loadPortraits();
+    return () => {
+      cancelled = true;
+    };
+  }, [characterPortraitStorageKey]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -191,6 +225,7 @@ export function DialogueReader({ article, onBack }: DialogueReaderProps) {
             const isRight = message.is_right_side;
             const avatarColor = generateAvatarColor(message.avatar_seed);
             const isPressed = pressedMessageId === message.id;
+            const portrait = characterPortraits[message.character_name];
 
             return (
               <div
@@ -198,9 +233,19 @@ export function DialogueReader({ article, onBack }: DialogueReaderProps) {
                 className={`flex gap-2 ${isRight ? 'flex-row-reverse' : ''}`}
               >
                 <div
-                  className={`w-10 h-10 rounded-md flex items-center justify-center text-white font-medium shrink-0 ${avatarColor}`}
+                  className={`w-10 h-10 rounded-md flex items-center justify-center text-white font-medium shrink-0 ${
+                    portrait ? 'bg-gray-200' : avatarColor
+                  }`}
                 >
-                  {getInitials(message.character_name)}
+                  {portrait ? (
+                    <img
+                      src={portrait}
+                      alt={`${message.character_name}-portrait`}
+                      className="w-full h-full rounded-md object-cover"
+                    />
+                  ) : (
+                    getInitials(message.character_name)
+                  )}
                 </div>
 
                 <div className={`max-w-[70%] ${isRight ? 'items-end' : 'items-start'}`}>

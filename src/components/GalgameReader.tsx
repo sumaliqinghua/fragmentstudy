@@ -3,6 +3,7 @@ import { ArrowLeft, History, X, ChevronDown, Settings2, FileText } from 'lucide-
 import type { Article, GalgameMessage } from '../types';
 import { getGalgameMessages, upsertProgress } from '../services/dataService';
 import { OriginalTextView } from './OriginalTextView';
+import { idbGet, idbSet } from '../services/localAssetStore';
 
 interface GalgameReaderProps {
   article: Article;
@@ -72,35 +73,65 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const [portraitWidth, setPortraitWidth] = useState(320);
   const [displayMode, setDisplayMode] = useState<'stage' | 'bubble'>('stage');
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(0.1);
+  const [backgroundMusic, setBackgroundMusic] = useState<string | null>(null);
   const [dialogueBarHeight, setDialogueBarHeight] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dialogueBarRef = useRef<HTMLDivElement>(null);
   const autoPlayTimerRef = useRef<number | null>(null);
-  const portraitStorageKey = `galgame_emotion_portraits_${article.id}`;
-  const characterPortraitStorageKey = `galgame_character_portraits_${article.id}`;
+  const hasLoadedEmotionPortraitsRef = useRef(false);
+  const hasLoadedCharacterPortraitsRef = useRef(false);
+  const portraitStorageKey = 'galgame_emotion_portraits_global';
+  const characterPortraitStorageKey = 'galgame_character_portraits_global';
+  const legacyPortraitStorageKey = `galgame_emotion_portraits_${article.id}`;
+  const legacyCharacterPortraitStorageKey = `galgame_character_portraits_${article.id}`;
   const portraitWidthStorageKey = `galgame_portrait_width_${article.id}`;
   const displayModeStorageKey = `galgame_display_mode_${article.id}`;
   const backgroundStorageKey = `galgame_background_${article.id}`;
+  const backgroundOverlayStorageKey = `galgame_background_overlay_${article.id}`;
+  const backgroundMusicStorageKey = `galgame_background_music_${article.id}`;
 
   useEffect(() => {
     loadMessages();
   }, [article.id]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(portraitStorageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Record<string, string>;
-        setEmotionPortraits(parsed);
-      } else {
-        setEmotionPortraits({});
+    let cancelled = false;
+    const loadPortraits = async () => {
+      try {
+        const stored = localStorage.getItem(portraitStorageKey);
+        const legacy = localStorage.getItem(legacyPortraitStorageKey);
+        const parsed = stored ? JSON.parse(stored) as Record<string, string> : {};
+        const legacyParsed = legacy ? JSON.parse(legacy) as Record<string, string> : {};
+        let merged = { ...parsed, ...legacyParsed };
+        if (!stored) {
+          const idbStored = await idbGet(portraitStorageKey);
+          if (idbStored) {
+            merged = { ...merged, ...(JSON.parse(idbStored) as Record<string, string>) };
+          }
+        }
+        if (!cancelled) {
+          setEmotionPortraits(merged);
+        }
+        if (legacy) {
+          localStorage.setItem(portraitStorageKey, JSON.stringify(merged));
+        }
+        await idbSet(portraitStorageKey, JSON.stringify(merged));
+        hasLoadedEmotionPortraitsRef.current = true;
+      } catch (error) {
+        console.warn('Failed to load emotion portraits:', error);
+        if (!cancelled) {
+          setEmotionPortraits({});
+        }
+        hasLoadedEmotionPortraitsRef.current = true;
       }
-    } catch (error) {
-      console.warn('Failed to load emotion portraits:', error);
-      setEmotionPortraits({});
-    }
-  }, [portraitStorageKey]);
+    };
+    loadPortraits();
+    return () => {
+      cancelled = true;
+    };
+  }, [portraitStorageKey, legacyPortraitStorageKey]);
 
   useEffect(() => {
     try {
@@ -140,32 +171,101 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(characterPortraitStorageKey);
+      const stored = localStorage.getItem(backgroundOverlayStorageKey);
       if (stored) {
-        const parsed = JSON.parse(stored) as Record<string, string>;
-        setCharacterPortraits(parsed);
-      } else {
-        setCharacterPortraits({});
+        const parsed = Number(stored);
+        if (!Number.isNaN(parsed)) {
+          setBackgroundOverlayOpacity(parsed);
+        }
       }
     } catch (error) {
-      console.warn('Failed to load character portraits:', error);
-      setCharacterPortraits({});
+      console.warn('Failed to load background overlay:', error);
     }
-  }, [characterPortraitStorageKey]);
+  }, [backgroundOverlayStorageKey]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(portraitStorageKey, JSON.stringify(emotionPortraits));
+      const stored = localStorage.getItem(backgroundMusicStorageKey);
+      if (stored) {
+        setBackgroundMusic(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to load background music:', error);
+    }
+  }, [backgroundMusicStorageKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPortraits = async () => {
+      try {
+        const stored = localStorage.getItem(characterPortraitStorageKey);
+        const legacy = localStorage.getItem(legacyCharacterPortraitStorageKey);
+        const parsed = stored ? JSON.parse(stored) as Record<string, string> : {};
+        const legacyParsed = legacy ? JSON.parse(legacy) as Record<string, string> : {};
+        let merged = { ...parsed, ...legacyParsed };
+        if (!stored) {
+          const idbStored = await idbGet(characterPortraitStorageKey);
+          if (idbStored) {
+            merged = { ...merged, ...(JSON.parse(idbStored) as Record<string, string>) };
+          }
+        }
+        if (!cancelled) {
+          setCharacterPortraits(merged);
+        }
+        if (legacy) {
+          localStorage.setItem(characterPortraitStorageKey, JSON.stringify(merged));
+        }
+        await idbSet(characterPortraitStorageKey, JSON.stringify(merged));
+        hasLoadedCharacterPortraitsRef.current = true;
+      } catch (error) {
+        console.warn('Failed to load character portraits:', error);
+        if (!cancelled) {
+          setCharacterPortraits({});
+        }
+        hasLoadedCharacterPortraitsRef.current = true;
+      }
+    };
+    loadPortraits();
+    return () => {
+      cancelled = true;
+    };
+  }, [characterPortraitStorageKey, legacyCharacterPortraitStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (!hasLoadedEmotionPortraitsRef.current) {
+        return;
+      }
+      const payload = JSON.stringify(emotionPortraits);
+      localStorage.setItem(portraitStorageKey, payload);
+      idbSet(portraitStorageKey, payload).catch((error) => {
+        console.warn('Failed to save emotion portraits to IDB:', error);
+      });
     } catch (error) {
       console.warn('Failed to save emotion portraits:', error);
+      const payload = JSON.stringify(emotionPortraits);
+      idbSet(portraitStorageKey, payload).catch((idbError) => {
+        console.warn('Failed to save emotion portraits to IDB:', idbError);
+      });
     }
   }, [emotionPortraits, portraitStorageKey]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(characterPortraitStorageKey, JSON.stringify(characterPortraits));
+      if (!hasLoadedCharacterPortraitsRef.current) {
+        return;
+      }
+      const payload = JSON.stringify(characterPortraits);
+      localStorage.setItem(characterPortraitStorageKey, payload);
+      idbSet(characterPortraitStorageKey, payload).catch((error) => {
+        console.warn('Failed to save character portraits to IDB:', error);
+      });
     } catch (error) {
       console.warn('Failed to save character portraits:', error);
+      const payload = JSON.stringify(characterPortraits);
+      idbSet(characterPortraitStorageKey, payload).catch((idbError) => {
+        console.warn('Failed to save character portraits to IDB:', idbError);
+      });
     }
   }, [characterPortraits, characterPortraitStorageKey]);
 
@@ -196,6 +296,26 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
       console.warn('Failed to save background image:', error);
     }
   }, [backgroundImage, backgroundStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(backgroundOverlayStorageKey, String(backgroundOverlayOpacity));
+    } catch (error) {
+      console.warn('Failed to save background overlay:', error);
+    }
+  }, [backgroundOverlayOpacity, backgroundOverlayStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (backgroundMusic) {
+        localStorage.setItem(backgroundMusicStorageKey, backgroundMusic);
+      } else {
+        localStorage.removeItem(backgroundMusicStorageKey);
+      }
+    } catch (error) {
+      console.warn('Failed to save background music:', error);
+    }
+  }, [backgroundMusic, backgroundMusicStorageKey]);
 
   useEffect(() => {
     if (!dialogueBarRef.current) {
@@ -341,6 +461,14 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
     reader.readAsDataURL(file);
   };
 
+  const handleBackgroundMusicUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBackgroundMusic(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getScreenEffectClass = () => {
     switch (screenEffect) {
       case 'shake':
@@ -386,7 +514,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const rightCharacter = currentMessage.position === 'right' ? currentMessage : null;
   const characterNames = Array.from(new Set(messages.map(msg => msg.character_name)));
   const portraitHeight = Math.round(portraitWidth * 1.45);
-  const portraitAreaPadding = Math.max(160, dialogueBarHeight + 8);
+  const portraitAreaPadding = Math.max(160, dialogueBarHeight + 15);
   const isBubbleMode = displayMode === 'bubble';
   const bubbleSide = currentMessage.position === 'right'
     ? 'right'
@@ -409,7 +537,10 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
             style={{ backgroundImage: `url(${backgroundImage})` }}
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-black/10" />
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: `rgba(0, 0, 0, ${backgroundOverlayOpacity})` }}
+        />
       </div>
       <style>{`
         @keyframes shake {
@@ -439,6 +570,9 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
         .animate-float { animation: float 3s ease-in-out infinite; }
         .animate-blink { animation: blink 1s ease-in-out infinite; }
       `}</style>
+      {backgroundMusic && (
+        <audio src={backgroundMusic} autoPlay loop className="hidden" />
+      )}
 
       <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/50 to-transparent" onClick={e => e.stopPropagation()}>
         <button
@@ -567,6 +701,46 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                   </button>
                 )}
               </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">遮罩透明度</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(backgroundOverlayOpacity * 100)}
+                  onChange={(e) => setBackgroundOverlayOpacity(parseInt(e.target.value) / 100)}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm text-gray-400">背景音乐</span>
+                <div className="flex items-center gap-2">
+                  <label className="px-3 py-1.5 text-xs text-gray-200 bg-gray-700 hover:bg-gray-600 rounded-md cursor-pointer transition-colors">
+                    上传
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) {
+                          return;
+                        }
+                        handleBackgroundMusicUpload(file);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                  {backgroundMusic && (
+                    <button
+                      onClick={() => setBackgroundMusic(null)}
+                      className="px-3 py-1.5 text-xs text-gray-300 hover:text-white rounded-md border border-gray-600 hover:border-gray-500 transition-colors"
+                    >
+                      清除
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -588,7 +762,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                     </div>
                   ) : (
                     emotionEmoji && currentMessage.position !== 'right' && (
-                      <div className="absolute -top-4 -right-4 text-3xl animate-bounce z-10">
+                      <div className="absolute -top-6 -right-6 text-7xl animate-bounce z-10">
                         {emotionEmoji}
                       </div>
                     )
@@ -626,7 +800,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                     </div>
                   ) : (
                     emotionEmoji && (
-                      <div className="absolute -top-4 -left-4 text-3xl animate-bounce z-10">
+                      <div className="absolute -top-6 -left-6 text-7xl animate-bounce z-10">
                         {emotionEmoji}
                       </div>
                     )
@@ -668,7 +842,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                     </div>
                   ) : (
                     emotionEmoji && (
-                      <div className={`absolute -top-4 ${bubbleSide === 'right' ? '-left-4' : '-right-4'} text-3xl animate-bounce z-10`}>
+                      <div className={`absolute -top-6 ${bubbleSide === 'right' ? '-left-6' : '-right-6'} text-7xl animate-bounce z-10`}>
                         {emotionEmoji}
                       </div>
                     )
