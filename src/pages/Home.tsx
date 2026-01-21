@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Settings, Coins, BookOpen, User, LogOut, ChevronDown, AlertCircle } from 'lucide-react';
-import { getArticles, deleteArticle, getTotalPoints } from '../services/dataService';
+import { getArticles, deleteArticle, getTotalPoints, getArticlesCacheSnapshot } from '../services/dataService';
 import { ArticleList } from '../components/ArticleList';
 import { ArticleInput } from '../components/ArticleInput';
 import { SettingsModal } from '../components/SettingsModal';
@@ -14,9 +14,10 @@ interface HomeProps {
 
 export function Home({ onSelectArticle }: HomeProps) {
   const { user, isGuest, signOut } = useAuth();
-  const [articles, setArticles] = useState<ArticleWithProgress[]>([]);
+  const cachedArticles = getArticlesCacheSnapshot();
+  const [articles, setArticles] = useState<ArticleWithProgress[]>(cachedArticles || []);
   const [totalPoints, setTotalPoints] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!cachedArticles);
   const [showInput, setShowInput] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -177,7 +178,7 @@ export function Home({ onSelectArticle }: HomeProps) {
           </button>
         </div>
 
-        {isLoading ? (
+        {isLoading && articles.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="mt-4 text-gray-500">加载中...</p>

@@ -21,6 +21,62 @@ import type {
   QuizGenerationResult,
 } from '../types';
 
+type CacheEntry<T> = {
+  data: T;
+  ts: number;
+};
+
+const CACHE_TTL_MS = 30_000;
+
+const cache = {
+  articles: null as CacheEntry<ArticleWithProgress[]> | null,
+  articlesById: new Map<string, CacheEntry<Article>>(),
+  cardsByArticleId: new Map<string, CacheEntry<Card[]>>(),
+  dialogueByArticleId: new Map<string, CacheEntry<DialogueMessage[]>>(),
+  galgameByArticleId: new Map<string, CacheEntry<GalgameMessage[]>>(),
+  quizByArticleId: new Map<string, CacheEntry<QuizQuestion[]>>(),
+};
+
+function isFresh<T>(entry: CacheEntry<T> | null): entry is CacheEntry<T> {
+  return !!entry && Date.now() - entry.ts < CACHE_TTL_MS;
+}
+
+function setCacheEntry<T>(map: Map<string, CacheEntry<T>>, key: string, data: T): void {
+  map.set(key, { data, ts: Date.now() });
+}
+
+function getCacheEntry<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
+  const entry = map.get(key);
+  if (entry && isFresh(entry)) {
+    return entry.data;
+  }
+  return null;
+}
+
+function invalidateArticlesCache(): void {
+  cache.articles = null;
+}
+
+function updateArticleCount(
+  articleId: string,
+  field: 'cardCount' | 'messageCount' | 'galgameMessageCount' | 'quizCount',
+  delta: number
+): void {
+  if (!cache.articles?.data) return;
+  const next = cache.articles.data.map((article) => {
+    if (article.id !== articleId) return article;
+    return {
+      ...article,
+      [field]: Math.max(0, (article[field] || 0) + delta),
+    };
+  });
+  cache.articles = { data: next, ts: Date.now() };
+}
+
+export function getArticlesCacheSnapshot(): ArticleWithProgress[] | null {
+  return cache.articles?.data || null;
+}
+
 async function getUserId(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
@@ -36,6 +92,10 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
     return guestStorage.getArticles();
   }
 
+  if (isFresh(cache.articles)) {
+    return cache.articles.data;
+  }
+
   const { data: articles, error } = await supabase
     .from('articles')
     .select('*')
@@ -44,50 +104,65 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
   if (error) throw error;
   if (!articles) return [];
 
-  const articlesWithProgress: ArticleWithProgress[] = [];
+  const articlesWithProgress = await Promise.all(
+    articles.map(async (article) => {
+      const { data: progress } = await supabase
+        .from('learning_progress')
+        .select('*')
+        .eq('article_id', article.id)
+        .maybeSingle();
 
-  for (const article of articles) {
-    const { data: progress } = await supabase
-      .from('learning_progress')
-      .select('*')
-      .eq('article_id', article.id)
-      .maybeSingle();
+      const [{ count: cardCount }, { count: messageCount }, { count: galgameMessageCount }, { count: quizCount }] = await Promise.all([
+        supabase
+          .from('cards')
+          .select('*', { count: 'exact', head: true })
+          .eq('article_id', article.id),
+        supabase
+          .from('dialogue_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('article_id', article.id),
+        supabase
+          .from('galgame_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('article_id', article.id),
+        supabase
+          .from('quiz_questions')
+          .select('*', { count: 'exact', head: true })
+          .eq('article_id', article.id),
+      ]);
 
-    const [{ count: cardCount }, { count: messageCount }, { count: galgameMessageCount }, { count: quizCount }] = await Promise.all([
-      supabase
-        .from('cards')
-        .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id),
-      supabase
-        .from('dialogue_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id),
-      supabase
-        .from('galgame_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id),
-      supabase
-        .from('quiz_questions')
-        .select('*', { count: 'exact', head: true })
-        .eq('article_id', article.id),
-    ]);
+      const enriched: ArticleWithProgress = {
+        ...article,
+        progress: progress || undefined,
+        cardCount: cardCount || 0,
+        messageCount: messageCount || 0,
+        galgameMessageCount: galgameMessageCount || 0,
+        quizCount: quizCount || 0,
+      };
+      cache.articlesById.set(article.id, { data: article, ts: Date.now() });
+      return enriched;
+    })
+  );
 
-    articlesWithProgress.push({
-      ...article,
-      progress: progress || undefined,
-      cardCount: cardCount || 0,
-      messageCount: messageCount || 0,
-      galgameMessageCount: galgameMessageCount || 0,
-      quizCount: quizCount || 0,
-    });
-  }
-
+  cache.articles = { data: articlesWithProgress, ts: Date.now() };
   return articlesWithProgress;
 }
 
 export async function getArticle(id: string): Promise<Article | null> {
   if (!(await isAuthenticated())) {
     return guestStorage.getArticle(id);
+  }
+
+  const cached = getCacheEntry(cache.articlesById, id);
+  if (cached) {
+    return cached;
+  }
+  if (cache.articles?.data) {
+    const fromList = cache.articles.data.find(article => article.id === id);
+    if (fromList) {
+      cache.articlesById.set(id, { data: fromList, ts: Date.now() });
+      return fromList;
+    }
   }
 
   const { data, error } = await supabase
@@ -97,6 +172,9 @@ export async function getArticle(id: string): Promise<Article | null> {
     .maybeSingle();
 
   if (error) throw error;
+  if (data) {
+    cache.articlesById.set(id, { data, ts: Date.now() });
+  }
   return data;
 }
 
@@ -118,6 +196,7 @@ export async function createArticle(
     .single();
 
   if (error) throw error;
+  invalidateArticlesCache();
   return data;
 }
 
@@ -132,11 +211,22 @@ export async function deleteArticle(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
+  cache.articlesById.delete(id);
+  cache.cardsByArticleId.delete(id);
+  cache.dialogueByArticleId.delete(id);
+  cache.galgameByArticleId.delete(id);
+  cache.quizByArticleId.delete(id);
+  invalidateArticlesCache();
 }
 
 export async function getCards(articleId: string): Promise<Card[]> {
   if (!(await isAuthenticated())) {
     return guestStorage.getCards(articleId);
+  }
+
+  const cached = getCacheEntry(cache.cardsByArticleId, articleId);
+  if (cached) {
+    return cached;
   }
 
   const { data, error } = await supabase
@@ -146,7 +236,9 @@ export async function getCards(articleId: string): Promise<Card[]> {
     .order('sequence_order', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCacheEntry(cache.cardsByArticleId, articleId, result);
+  return result;
 }
 
 export async function createCards(
@@ -169,7 +261,11 @@ export async function createCards(
     .select();
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  const existing = cache.cardsByArticleId.get(articleId)?.data || [];
+  setCacheEntry(cache.cardsByArticleId, articleId, [...existing, ...result]);
+  updateArticleCount(articleId, 'cardCount', result.length);
+  return result;
 }
 
 export async function getProgress(articleId: string): Promise<LearningProgress | null> {
@@ -474,6 +570,11 @@ export async function getDialogueMessages(articleId: string): Promise<DialogueMe
     return guestStorage.getDialogueMessages(articleId);
   }
 
+  const cached = getCacheEntry(cache.dialogueByArticleId, articleId);
+  if (cached) {
+    return cached;
+  }
+
   const { data, error } = await supabase
     .from('dialogue_messages')
     .select('*')
@@ -481,7 +582,9 @@ export async function getDialogueMessages(articleId: string): Promise<DialogueMe
     .order('sequence_order', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCacheEntry(cache.dialogueByArticleId, articleId, result);
+  return result;
 }
 
 export async function createDialogueMessages(
@@ -508,7 +611,11 @@ export async function createDialogueMessages(
     .select();
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  const existing = cache.dialogueByArticleId.get(articleId)?.data || [];
+  setCacheEntry(cache.dialogueByArticleId, articleId, [...existing, ...result]);
+  updateArticleCount(articleId, 'messageCount', result.length);
+  return result;
 }
 
 export async function getDialogueQAs(articleId: string): Promise<DialogueQA[]> {
@@ -641,6 +748,11 @@ export async function getGalgameMessages(articleId: string): Promise<GalgameMess
     return guestStorage.getGalgameMessages(articleId);
   }
 
+  const cached = getCacheEntry(cache.galgameByArticleId, articleId);
+  if (cached) {
+    return cached;
+  }
+
   const { data, error } = await supabase
     .from('galgame_messages')
     .select('*')
@@ -648,12 +760,19 @@ export async function getGalgameMessages(articleId: string): Promise<GalgameMess
     .order('sequence_order', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCacheEntry(cache.galgameByArticleId, articleId, result);
+  return result;
 }
 
 export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[]> {
   if (!(await isAuthenticated())) {
     return guestStorage.getQuizQuestions(articleId);
+  }
+
+  const cached = getCacheEntry(cache.quizByArticleId, articleId);
+  if (cached) {
+    return cached;
   }
 
   const { data, error } = await supabase
@@ -663,7 +782,9 @@ export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[
     .order('sequence_order', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCacheEntry(cache.quizByArticleId, articleId, result);
+  return result;
 }
 
 export async function createGalgameMessages(
@@ -692,7 +813,11 @@ export async function createGalgameMessages(
     .select();
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  const existing = cache.galgameByArticleId.get(articleId)?.data || [];
+  setCacheEntry(cache.galgameByArticleId, articleId, [...existing, ...result]);
+  updateArticleCount(articleId, 'galgameMessageCount', result.length);
+  return result;
 }
 
 export async function createQuizQuestions(
@@ -715,7 +840,11 @@ export async function createQuizQuestions(
     .select();
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  const existing = cache.quizByArticleId.get(articleId)?.data || [];
+  setCacheEntry(cache.quizByArticleId, articleId, [...existing, ...result]);
+  updateArticleCount(articleId, 'quizCount', result.length);
+  return result;
 }
 
 export async function getArticleTextAnnotations(articleId: string): Promise<ArticleTextAnnotation[]> {
