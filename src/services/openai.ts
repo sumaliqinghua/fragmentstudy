@@ -449,3 +449,55 @@ export async function generateQuizQuestions(content: string): Promise<QuizGenera
 
   return parseJsonArray<QuizGenerationResult>(resultText);
 }
+
+export async function generateLearningArticle(prompt: string): Promise<{ title: string; content: string }> {
+  const systemPrompt = `你是一个学习文章写作助手。请根据用户的问题或内容，生成一篇结构清晰、可读性强的学习文章。
+
+要求：
+1. 内容准确、通俗易懂，适合学习复盘
+2. 可以使用小标题和列表来组织结构
+3. 输出 JSON 格式：{"title": "...", "content": "..."}，只返回 JSON，不要其他内容`;
+
+  const config = getOpenAIConfig();
+
+  if (!config.apiKey) {
+    throw new Error('请先配置 API Key');
+  }
+
+  const response = await fetch(getProxyUrl(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({
+      apiKey: config.apiKey,
+      apiEndpoint: config.apiEndpoint,
+      model: config.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `用户输入：${prompt}` },
+      ],
+      stream: false,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error?.message || `API 请求失败: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const resultText = data.choices[0]?.message?.content || '{}';
+
+  try {
+    const parsed = JSON.parse(resultText);
+    return {
+      title: String(parsed.title || '').trim(),
+      content: String(parsed.content || '').trim(),
+    };
+  } catch (error) {
+    throw new AIResponseParseError('AI 返回格式错误，请重试', resultText);
+  }
+}

@@ -174,7 +174,7 @@ export function Home({ onSelectArticle }: HomeProps) {
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-medium hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-500/20"
           >
             <Plus className="w-5 h-5" />
-            导入文章
+            新增内容
           </button>
         </div>
 
