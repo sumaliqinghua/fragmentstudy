@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, History, X, ChevronDown, Settings2, FileText } from 'lucide-react';
+import { ArrowLeft, History, X, ChevronDown, Settings2, FileText, Cloud } from 'lucide-react';
 import type { Article, GalgameMessage } from '../types';
 import { getGalgameMessages, upsertProgress } from '../services/dataService';
 import { OriginalTextView } from './OriginalTextView';
 import { idbGet, idbSet } from '../services/localAssetStore';
+import { CloudImagePicker } from './CloudImagePicker';
 
 interface GalgameReaderProps {
   article: Article;
@@ -71,6 +72,8 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   const [showCharacterPortraitSettings, setShowCharacterPortraitSettings] = useState(false);
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
   const [portraitWidth, setPortraitWidth] = useState(320);
+  const [showCloudImagePicker, setShowCloudImagePicker] = useState(false);
+  const [cloudImagePickerTarget, setCloudImagePickerTarget] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<'stage' | 'bubble'>('stage');
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(0.1);
@@ -1126,6 +1129,16 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
                           }}
                         />
                       </label>
+                      <button
+                        onClick={() => {
+                          setCloudImagePickerTarget(name);
+                          setShowCloudImagePicker(true);
+                        }}
+                        className="px-3 py-1.5 text-xs text-teal-300 bg-teal-900/50 hover:bg-teal-800/60 rounded-md flex items-center gap-1 transition-colors"
+                      >
+                        <Cloud className="w-3 h-3" />
+                        云端
+                      </button>
                       {portrait && (
                         <button
                           onClick={() => handleCharacterPortraitClear(name)}
@@ -1143,6 +1156,20 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
           </div>
         </div>
       )}
+
+      <CloudImagePicker
+        isOpen={showCloudImagePicker}
+        onClose={() => {
+          setShowCloudImagePicker(false);
+          setCloudImagePickerTarget(null);
+        }}
+        onSelect={(imageUrl) => {
+          if (cloudImagePickerTarget) {
+            setCharacterPortraits(prev => ({ ...prev, [cloudImagePickerTarget]: imageUrl }));
+          }
+        }}
+        title={cloudImagePickerTarget ? `为 ${cloudImagePickerTarget} 选择立绘` : '云端图片库'}
+      />
 
       <OriginalTextView
         isOpen={showOriginalText}
