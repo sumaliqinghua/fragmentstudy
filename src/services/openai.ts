@@ -29,8 +29,8 @@ export function getOpenAIConfig(): OpenAIConfig {
   }
   return {
     apiKey: '',
-    apiEndpoint: 'https://api.openai.com/v1',
-    model: 'gpt-4o-mini',
+    apiEndpoint: 'https://api.qnaigc.com/v1',
+    model: 'minimax/minimax-m2.1',
   };
 }
 

@@ -12,6 +12,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiEndpoint, setApiEndpoint] = useState('');
   const [model, setModel] = useState('');
   const [saved, setSaved] = useState(false);
+  const modelOptions = [
+    'qwen3-max',
+    'deepseek/deepseek-v3.2-251201',
+    'doubao-seed-1.6-thinking',
+    'doubao-seed-1.6',
+    'minimax/minimax-m2.1',
+    'moonshotai/kimi-k2-thinking',
+    'z-ai/glm-4.6',
+  ];
+  const availableModels =
+    model && !modelOptions.includes(model) ? [model, ...modelOptions] : modelOptions;
 
   useEffect(() => {
     if (isOpen) {
@@ -54,7 +65,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               type="url"
               value={apiEndpoint}
               onChange={(e) => setApiEndpoint(e.target.value)}
-              placeholder="https://api.openai.com/v1"
+              placeholder="https://api.qnaigc.com/v1"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm"
             />
             <p className="mt-1.5 text-xs text-gray-500">
@@ -81,13 +92,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <Cpu className="w-4 h-4" />
               模型
             </label>
-            <input
-              type="text"
+            <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="gpt-4o-mini"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm"
-            />
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm bg-white"
+            >
+              {availableModels.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

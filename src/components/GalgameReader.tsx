@@ -1169,6 +1169,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
           }
         }}
         title={cloudImagePickerTarget ? `为 ${cloudImagePickerTarget} 选择立绘` : '云端图片库'}
+        characterName={cloudImagePickerTarget || undefined}
       />
 
       <OriginalTextView
