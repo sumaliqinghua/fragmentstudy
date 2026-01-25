@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Import Learning Material</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#22c55e", // Vibrant green
+                        "primary-dark": "#15803d",
+                        "background-light": "#ffffff", // Pure white
+                        "surface-light": "#f8fafc", // Very light gray for cards
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "2xl": "2rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-white text-slate-900 font-display antialiased selection:bg-green-100 selection:text-green-900">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto border-x border-slate-50 bg-white">
+<div class="flex items-center p-4 pb-2 justify-between sticky top-0 z-10 bg-white/90 backdrop-blur-sm">
+<button class="text-slate-900 flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined text-[24px]">close</span>
+</button>
+<h2 class="text-slate-900 text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Import Content</h2>
+<button class="flex w-12 items-center justify-end group">
+<p class="text-primary text-base font-bold leading-normal tracking-[0.015em] shrink-0 group-hover:opacity-80">Help</p>
+</button>
+</div>
+<div class="px-4 pb-6 pt-4">
+<h1 class="text-slate-900 tracking-tight text-[32px] font-extrabold leading-[1.15] text-left">
+            What do you want to <span class="text-primary">process</span> today?
+        </h1>
+<p class="text-slate-500 text-base font-medium leading-normal pt-2">
+            Turn your data into interactive lessons.
+        </p>
+</div>
+<div class="flex flex-col gap-4 px-4">
+<button class="group w-full text-left">
+<div class="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100 transition-all active:scale-[0.98] hover:border-primary/30 hover:shadow-md hover:shadow-green-100/50">
+<div class="flex flex-col gap-1 flex-[2_2_0px]">
+<p class="text-slate-900 text-lg font-bold leading-tight">Paste Article</p>
+<p class="text-slate-500 text-sm font-medium leading-normal">Copy text from web or notes</p>
+</div>
+<div class="size-16 rounded-xl flex items-center justify-center bg-white shrink-0 text-primary shadow-sm border border-slate-100 group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[32px]">content_paste</span>
+</div>
+</div>
+</button>
+<button class="group w-full text-left">
+<div class="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100 transition-all active:scale-[0.98] hover:border-primary/30 hover:shadow-md hover:shadow-green-100/50">
+<div class="flex flex-col gap-1 flex-[2_2_0px]">
+<p class="text-slate-900 text-lg font-bold leading-tight">Upload PDF</p>
+<p class="text-slate-500 text-sm font-medium leading-normal">Scan or upload documents</p>
+</div>
+<div class="size-16 rounded-xl flex items-center justify-center bg-white shrink-0 text-primary shadow-sm border border-slate-100 group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[32px]">upload_file</span>
+</div>
+</div>
+</button>
+<button class="group w-full text-left">
+<div class="relative flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100 transition-all active:scale-[0.98] hover:border-primary/30 hover:shadow-md hover:shadow-green-100/50">
+<div class="flex flex-col gap-1 flex-[2_2_0px]">
+<div class="flex items-center gap-2">
+<p class="text-slate-900 text-lg font-bold leading-tight">AI Generate</p>
+<span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-wider">New</span>
+</div>
+<p class="text-slate-500 text-sm font-medium leading-normal">Create content from prompts</p>
+</div>
+<div class="size-16 rounded-xl flex items-center justify-center bg-white shrink-0 text-primary shadow-sm border border-slate-100 group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[32px]">dataset</span>
+</div>
+</div>
+</button>
+</div>
+<div class="h-8"></div>
+<div class="flex flex-col px-4">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-slate-900 text-lg font-bold leading-tight">Jump back in</h3>
+<button class="text-primary text-sm font-bold hover:text-green-700 transition-colors">View all</button>
+</div>
+<div class="flex gap-3 overflow-x-auto no-scrollbar pb-4 -mx-4 px-4">
+<div class="flex-shrink-0 w-40 flex flex-col gap-2 group cursor-pointer">
+<div class="w-full aspect-[4/3] rounded-xl bg-white relative overflow-hidden border border-slate-200 transition-all group-hover:border-primary/50 group-hover:shadow-sm">
+<div class="absolute inset-0 flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-5xl">text_snippet</span>
+</div>
+</div>
+<div>
+<p class="text-slate-900 text-sm font-bold truncate">Article_import_01</p>
+<p class="text-slate-400 text-xs truncate">2 hours ago</p>
+</div>
+</div>
+<div class="flex-shrink-0 w-40 flex flex-col gap-2 group cursor-pointer">
+<div class="w-full aspect-[4/3] rounded-xl bg-white relative overflow-hidden border border-slate-200 transition-all group-hover:border-primary/50 group-hover:shadow-sm">
+<div class="absolute inset-0 flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-5xl">folder_open</span>
+</div>
+</div>
+<div>
+<p class="text-slate-900 text-sm font-bold truncate">Travel Data Set</p>
+<p class="text-slate-400 text-xs truncate">Yesterday</p>
+</div>
+</div>
+<div class="flex-shrink-0 w-40 flex flex-col gap-2 group cursor-pointer">
+<div class="w-full aspect-[4/3] rounded-xl bg-white relative overflow-hidden border border-slate-200 transition-all group-hover:border-primary/50 group-hover:shadow-sm">
+<div class="absolute inset-0 flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-5xl">description</span>
+</div>
+</div>
+<div>
+<p class="text-slate-900 text-sm font-bold truncate">Generated Text</p>
+<p class="text-slate-400 text-xs truncate">3 days ago</p>
+</div>
+</div>
+</div>
+</div>
+<div class="h-20"></div>
+</div>
+
+</body></html>

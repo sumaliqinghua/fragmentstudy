@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Knowledge Flashcards</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#58cc02",
+                        "primary-dark": "#46a302",
+                        "secondary": "#1cb0f6",
+                        "background": "#f8f9fa",
+                        "surface": "#ffffff",
+                        "surface-muted": "#f0f0f0",
+                        "text-main": "#2c3e50",
+                        "text-sub": "#777777",
+                        "border-color": "#e5e5e5",
+                        "danger": "#ff4b4b",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "2xl": "2rem",
+                        "3xl": "2.5rem",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "card": "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                        "glow": "0 0 15px rgba(88, 204, 2, 0.3)",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+        }.no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-text-main font-display h-screen w-full flex flex-col overflow-hidden selection:bg-primary selection:text-white">
+<header class="flex items-center justify-between p-4 pt-6 z-10 shrink-0">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-black/5 transition-colors text-gray-400 hover:text-gray-600">
+<span class="material-symbols-outlined" style="font-size: 28px;">close</span>
+</button>
+<div class="flex-1 mx-4 flex flex-col gap-1.5">
+<div class="flex justify-between items-end px-1">
+<span class="text-xs font-bold uppercase tracking-wider text-primary">Lesson 3</span>
+<span class="text-xs font-bold text-gray-400">12 / 50</span>
+</div>
+<div class="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full transition-all duration-500 ease-out" style="width: 24%;"></div>
+</div>
+</div>
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-black/5 transition-colors text-gray-400 hover:text-gray-600">
+<span class="material-symbols-outlined" style="font-size: 24px;">settings</span>
+</button>
+</header>
+<main class="flex-1 flex flex-col items-center justify-center relative w-full px-6 py-4">
+<div class="absolute w-[85%] h-[60%] bg-white rounded-3xl top-[54%] left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-40 scale-90 border border-gray-200 shadow-sm"></div>
+<div class="absolute w-[90%] h-[65%] bg-white rounded-3xl top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-70 scale-95 shadow-md border border-gray-200"></div>
+<div class="relative w-full max-w-sm aspect-[4/5] bg-white rounded-3xl shadow-xl flex flex-col overflow-hidden border border-gray-100 group">
+<div class="px-6 pt-6 flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="bg-secondary/10 text-secondary px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider">Business Concept</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col justify-center px-8 gap-8">
+<h2 class="text-2xl md:text-3xl font-bold leading-snug text-gray-800 text-center">
+                    Product-market fit is achieved when you have the right solution for the right audience.
+                </h2>
+<div class="w-full h-px bg-gray-100 my-2"></div>
+<div class="group-hover:opacity-100 opacity-30 transition-opacity duration-300 flex flex-col items-center gap-3 cursor-pointer">
+<p class="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Tap to reveal explanation</p>
+<p class="text-lg text-gray-600 font-medium text-center leading-relaxed">It means being in a good market with a product that can satisfy that market.</p>
+</div>
+</div>
+<div class="h-3 w-full bg-gradient-to-r from-transparent via-gray-100 to-transparent bottom-0 absolute"></div>
+</div>
+</main>
+<footer class="pb-10 pt-4 px-6 flex justify-center items-center gap-8 shrink-0">
+<button aria-label="Skip" class="flex items-center justify-center size-16 rounded-full bg-white border-2 border-gray-200 text-gray-300 shadow-sm hover:border-danger hover:text-danger hover:scale-105 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined text-[32px]">close</span>
+</button>
+<button aria-label="Previous" class="flex items-center justify-center size-12 rounded-full bg-transparent text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors">
+<span class="material-symbols-outlined text-[28px]">replay</span>
+</button>
+<button aria-label="Mastered" class="flex items-center justify-center size-16 rounded-full bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary-dark hover:scale-105 active:scale-95 transition-all duration-200">
+<span class="material-symbols-outlined text-[32px]">check</span>
+</button>
+</footer>
+
+</body></html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Material Reader - Article View</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#22c55e",
+                        "secondary": "#fbbf24",
+                        "background-main": "#ffffff",
+                        "text-heavy": "#000000",
+                        "text-standard": "#171717",
+                        "text-muted": "#525252",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.6rem", "lg": "1rem", "xl": "1.5rem", "2xl": "2rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        .interactive-word {
+            cursor: pointer;
+            border-bottom: 2px solid #e5e5e5;
+            transition: all 0.2s ease;
+        }
+        .active-word {
+            background-color: #fef08a;
+            color: #000;
+            border-bottom: 2px solid #fbbf24;
+            padding: 0 2px;
+            border-radius: 2px;
+            font-weight: 600;
+        }
+        .highlight-sentence {
+            background-color: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding-left: 12px;
+            display: block;
+            margin: 1.5rem 0;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-main font-display antialiased text-text-standard min-h-screen flex flex-col relative overflow-hidden">
+<header class="fixed top-0 left-0 right-0 z-40 bg-white border-b-2 border-slate-100 px-4 h-16 flex items-center justify-between">
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-50 transition text-black">
+<span class="material-symbols-outlined text-[24px]">close</span>
+</button>
+<div class="flex-1 max-w-[180px] mx-4 flex flex-col items-center gap-1.5">
+<div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+<div class="h-full bg-primary w-[35%] rounded-full"></div>
+</div>
+</div>
+<button class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-50 transition text-black">
+<span class="material-symbols-outlined text-[24px]">settings</span>
+</button>
+</header>
+<main class="flex-grow pt-24 pb-48 overflow-y-auto px-6 max-w-lg mx-auto w-full">
+<div class="mb-8">
+<div class="w-full h-52 rounded-2xl overflow-hidden mb-6 shadow-sm border border-slate-100">
+<img alt="Solar panels and wind turbines in a green field representing renewable energy" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCx_LG642qgkdqBEKF-yDaP5DSCWjIVbgsSa5DPPVqyk7EwM-T9W6xgvhnPVc1LyyOKOPVf2ivjq5_566eEyiVuuYbPVlra3of2wJ2zdk_OWtTCpx4BlHsKgPOSuE0nT-3f6LCmde9GzVUDI_FUU3uOwUko-b4OPQIskUtlR4HpfxKDzo797zkWzxV3JKh8LGkN4X0snTH8VVGqqAxumucME3GkAtbKzkpMy4Ts1t7bheBsKnRTG-mUzw28CTn12JxL7RbBAAuul1R"/>
+</div>
+<h1 class="text-3xl font-extrabold leading-tight tracking-tight text-text-heavy mb-4">
+            The Future of Renewable Energy
+        </h1>
+<div class="flex items-center gap-3">
+<div class="flex h-7 items-center justify-center gap-x-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-3">
+<span class="material-symbols-outlined text-emerald-600 text-[16px] filled">bolt</span>
+<p class="text-emerald-700 text-[11px] font-bold uppercase tracking-wider">Intermediate</p>
+</div>
+<div class="flex h-7 items-center justify-center gap-x-1.5 rounded-full bg-slate-50 border border-slate-200 px-3">
+<span class="material-symbols-outlined text-slate-500 text-[16px]">menu_book</span>
+<p class="text-slate-600 text-[11px] font-bold uppercase tracking-wider">5 min read</p>
+</div>
+</div>
+</div>
+<article class="prose prose-lg max-w-none">
+<p class="text-[20px] leading-[1.8] text-text-standard mb-8 font-normal">
+<span class="interactive-word">Renewable</span>
+<span class="interactive-word">energy</span>
+<span class="interactive-word">is</span>
+<span class="interactive-word">collected</span>
+<span class="interactive-word">from</span>
+<span class="interactive-word">resources</span>
+<span class="interactive-word">that</span>
+<span class="interactive-word">are</span>
+<span class="interactive-word">naturally</span>
+<span class="active-word">replenished</span>
+<span class="interactive-word">on</span>
+<span class="interactive-word">a</span>
+<span class="interactive-word">human</span>
+<span class="interactive-word">timescale.</span>
+<span class="interactive-word">It</span>
+<span class="interactive-word">includes</span>
+<span class="interactive-word">sources</span>
+<span class="interactive-word">such</span>
+<span class="interactive-word">as</span>
+<span class="interactive-word">sunlight,</span>
+<span class="interactive-word">wind,</span>
+<span class="interactive-word">rain,</span>
+<span class="interactive-word">tides,</span>
+<span class="interactive-word">waves,</span>
+<span class="interactive-word">and</span>
+<span class="interactive-word">geothermal</span>
+<span class="interactive-word">heat.</span>
+</p>
+<div class="highlight-sentence">
+<p class="text-[20px] leading-[1.8] text-text-heavy font-medium py-2">
+                Although most renewable energy sources are sustainable, some are not.
+            </p>
+</div>
+<p class="text-[20px] leading-[1.8] text-text-standard mb-8 font-normal">
+            For example, some biomass sources are considered unsustainable at current rates of exploitation. About 20% of humans' global energy consumption comes from renewables, including nearly 30% of electricity.
+        </p>
+<p class="text-[20px] leading-[1.8] text-text-standard mb-8 font-normal">
+            This share is rising rapidly as countries move away from fossil fuels to combat climate change. While many renewable energy projects are large-scale, renewable technologies are also suited to rural and remote areas.
+        </p>
+<div class="mt-12 mb-8 p-6 rounded-2xl bg-slate-50 border-2 border-slate-100">
+<h3 class="text-xl font-bold text-text-heavy mb-2">Comprehension Check</h3>
+<p class="text-text-muted mb-6">Test your understanding of the material.</p>
+<button class="w-full bg-primary text-white font-bold py-4 px-6 rounded-xl shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                Start Quiz
+                <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</article>
+</main>
+<div class="fixed inset-0 z-50 pointer-events-none">
+<div class="absolute inset-0 bg-black/10 pointer-events-auto"></div>
+<div class="absolute bottom-8 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[420px] pointer-events-auto">
+<div class="bg-white rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-100">
+<div class="p-8">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h2 class="text-3xl font-extrabold text-text-heavy tracking-tight mb-1">replenished</h2>
+<span class="text-primary font-bold text-sm uppercase tracking-widest">Verb</span>
+</div>
+<button class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500">
+<span class="material-symbols-outlined text-[22px]">volume_up</span>
+</button>
+</div>
+<div class="space-y-6">
+<div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+<p class="text-text-heavy text-lg leading-snug">To fill something up again; to restore to a former level or condition.</p>
+<p class="mt-3 text-text-muted text-base italic border-t border-slate-200 pt-3">
+                            "The water supply was replenished by the heavy rain."
+                        </p>
+</div>
+<div class="flex gap-3">
+<button class="flex-1 bg-white border-2 border-slate-200 hover:border-slate-300 text-text-heavy font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+                            Save
+                        </button>
+<button class="flex-1 bg-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-100 flex items-center justify-center gap-2">
+                            Got it
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>
