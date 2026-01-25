@@ -1,213 +1,230 @@
-import { useState, useEffect } from 'react';
-import { Plus, Settings, Coins, BookOpen, User, LogOut, ChevronDown, AlertCircle } from 'lucide-react';
-import { getArticles, deleteArticle, getTotalPoints, getArticlesCacheSnapshot } from '../services/dataService';
-import { ArticleList } from '../components/ArticleList';
-import { ArticleInput } from '../components/ArticleInput';
-import { SettingsModal } from '../components/SettingsModal';
-import { AuthModal } from '../components/AuthModal';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, Flame, Gem, Plus } from 'lucide-react';
+import {
+  getArticles,
+  getCards,
+  getProgress,
+  getQuizQuestions,
+  getRewards,
+  getTotalPoints,
+  getArticlesCacheSnapshot,
+} from '../services/dataService';
+import { LearningPath } from '../components/LearningPath';
+import { generateLearningPath, type PathNode } from '../utils/pathGenerator';
+import type { ArticleWithProgress, Card, LearningProgress, QuizQuestion } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import type { ArticleWithProgress } from '../types';
 
 interface HomeProps {
   onSelectArticle: (id: string) => void;
+  onCreate: () => void;
+  onOpenNode?: (node: PathNode, articleId: string) => void;
 }
 
-export function Home({ onSelectArticle }: HomeProps) {
-  const { user, isGuest, signOut } = useAuth();
+export function Home({ onSelectArticle, onCreate, onOpenNode }: HomeProps) {
+  const { user } = useAuth();
   const cachedArticles = getArticlesCacheSnapshot();
   const [articles, setArticles] = useState<ArticleWithProgress[]>(cachedArticles || []);
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(
+    cachedArticles?.[0]?.id || null
+  );
   const [totalPoints, setTotalPoints] = useState(0);
   const [isLoading, setIsLoading] = useState(!cachedArticles);
-  const [showInput, setShowInput] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
+  const [progress, setProgress] = useState<LearningProgress | null>(null);
+  const [claimedMilestones, setClaimedMilestones] = useState<number[]>([]);
+  const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
+  const [isPathLoading, setIsPathLoading] = useState(false);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [articlesData, points] = await Promise.all([
-        getArticles(),
-        getTotalPoints(),
-      ]);
-      setArticles(articlesData);
-      setTotalPoints(points);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const selectedArticle = useMemo(
+    () => articles.find((article) => article.id === selectedArticleId) || null,
+    [articles, selectedArticleId]
+  );
 
   useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [articlesData, points] = await Promise.all([getArticles(), getTotalPoints()]);
+        setArticles(articlesData);
+        setTotalPoints(points);
+        setSelectedArticleId((current) => current ?? articlesData[0]?.id ?? null);
+      } catch (error) {
+        console.error('Failed to load home data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadData();
   }, [user]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这篇文章吗？')) return;
+  useEffect(() => {
+    if (!selectedArticleId) return;
 
-    try {
-      await deleteArticle(id);
-      setArticles(prev => prev.filter(a => a.id !== id));
-    } catch (error) {
-      console.error('Failed to delete article:', error);
+    const loadPathData = async () => {
+      setIsPathLoading(true);
+      try {
+        const [cardsData, quizData, progressData, rewardData] = await Promise.all([
+          getCards(selectedArticleId),
+          getQuizQuestions(selectedArticleId),
+          getProgress(selectedArticleId),
+          getRewards(selectedArticleId),
+        ]);
+        setCards(cardsData);
+        setQuizzes(quizData);
+        setProgress(progressData);
+        setClaimedMilestones(rewardData.map((reward) => reward.milestone));
+      } catch (error) {
+        console.error('Failed to load path data:', error);
+      } finally {
+        setIsPathLoading(false);
+      }
+    };
+
+    loadPathData();
+  }, [selectedArticleId]);
+
+  useEffect(() => {
+    const nodes = generateLearningPath({
+      cards,
+      quizzes,
+      progress,
+      claimedMilestones,
+    });
+    setPathNodes(nodes);
+  }, [cards, quizzes, progress, claimedMilestones]);
+
+  const handleSelectArticle = (id: string) => {
+    setSelectedArticleId(id);
+    setShowDropdown(false);
+  };
+
+  const handleNodeClick = (node: PathNode) => {
+    if (!selectedArticleId) return;
+    if (node.status === 'locked') return;
+    if (onOpenNode) {
+      onOpenNode(node, selectedArticleId);
+      return;
     }
+    onSelectArticle(selectedArticleId);
   };
 
-  const handleOpenLogin = () => {
-    setAuthModalMode('login');
-    setShowAuthModal(true);
-  };
-
-  const handleOpenRegister = () => {
-    setAuthModalMode('register');
-    setShowAuthModal(true);
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    setShowUserMenu(false);
-    loadData();
-  };
+  if (isLoading && articles.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-slate-500">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-xl flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-gray-900">卡片学习</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-full">
-              <Coins className="w-4 h-4 text-amber-500" />
-              <span className="text-sm font-semibold text-amber-700">{totalPoints}</span>
-            </div>
-
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <div className="max-w-md mx-auto px-4 pt-6">
+        <header className="flex items-center justify-between gap-4">
+          <div className="relative">
             <button
-              onClick={() => setShowSettings(true)}
-              className="p-2.5 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={() => setShowDropdown((prev) => !prev)}
+              className="flex items-center gap-2 px-3 py-2 bg-white rounded-2xl shadow-sm border border-slate-100"
             >
-              <Settings className="w-5 h-5 text-gray-600" />
+              <div>
+                <p className="text-xs text-slate-400">当前文章</p>
+                <p className="text-sm font-semibold text-slate-800 font-display max-w-[180px] truncate">
+                  {selectedArticle?.title || '请选择文章'}
+                </p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-slate-500" />
             </button>
-
-            {isGuest ? (
-              <button
-                onClick={handleOpenLogin}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors"
-              >
-                <User className="w-4 h-4" />
-                登录
-              </button>
-            ) : (
-              <div className="relative">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
-                >
-                  <div className="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center">
-                    <User className="w-3.5 h-3.5 text-white" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate">
-                    {user?.email?.split('@')[0]}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
-                </button>
-
-                {showUserMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowUserMenu(false)}
-                    />
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20">
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-xs text-gray-500">已登录为</p>
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {user?.email}
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        退出登录
-                      </button>
-                    </div>
-                  </>
+            {showDropdown && (
+              <div className="absolute mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-lg z-20 overflow-hidden">
+                {articles.map((article) => (
+                  <button
+                    key={article.id}
+                    onClick={() => handleSelectArticle(article.id)}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    {article.title}
+                  </button>
+                ))}
+                {articles.length === 0 && (
+                  <div className="px-4 py-3 text-sm text-slate-400">暂无文章</div>
                 )}
               </div>
             )}
           </div>
-        </div>
-      </header>
 
-      {isGuest && (
-        <div className="bg-amber-50 border-b border-amber-100">
-          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-              <p className="text-sm text-amber-800">
-                您当前以访客身份使用，数据仅保存在本地
-              </p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
+              <Flame className="w-4 h-4 text-orange-500" />
+              <span className="text-sm font-semibold text-slate-700">3 天</span>
             </div>
+            <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
+              <Gem className="w-4 h-4 text-secondary" />
+              <span className="text-sm font-semibold text-slate-700">{totalPoints}</span>
+            </div>
+          </div>
+        </header>
+
+        {articles.length === 0 ? (
+          <div className="mt-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-10">
+            <p className="text-lg font-semibold text-slate-700">导入你的第一篇文章</p>
+            <p className="text-sm text-slate-400 mt-2">支持粘贴、上传 PDF 或 AI 生成</p>
             <button
-              onClick={handleOpenRegister}
-              className="shrink-0 px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
+              onClick={onCreate}
+              className="mt-6 inline-flex items-center gap-2 px-5 py-3 bg-secondary text-white rounded-2xl shadow-[0_6px_0_0_#245aa3] active:translate-y-1"
             >
-              注册保存
+              <Plus className="w-4 h-4" />
+              立即开始
             </button>
           </div>
-        </div>
-      )}
-
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">我的文章</h2>
-          <button
-            onClick={() => setShowInput(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-medium hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-500/20"
-          >
-            <Plus className="w-5 h-5" />
-            新增内容
-          </button>
-        </div>
-
-        {isLoading && articles.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="mt-4 text-gray-500">加载中...</p>
-          </div>
         ) : (
-          <ArticleList
-            articles={articles}
-            onSelect={onSelectArticle}
-            onDelete={handleDelete}
-          />
+          <section className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 font-display">学习路径</h2>
+                <p className="text-sm text-slate-400">每完成 2 张卡片解锁一次测验</p>
+              </div>
+              <button
+                onClick={() => selectedArticleId && onSelectArticle(selectedArticleId)}
+                className="text-sm font-semibold text-secondary"
+              >
+                查看详情
+              </button>
+            </div>
+
+            {isPathLoading ? (
+              <div className="text-center py-12">
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="mt-3 text-sm text-slate-400">正在生成路径...</p>
+              </div>
+            ) : cards.length === 0 ? (
+              <div className="bg-white border border-slate-100 rounded-3xl p-6 text-center">
+                <p className="text-base font-semibold text-slate-700">还没有生成学习卡片</p>
+                <p className="text-sm text-slate-400 mt-2">先在新建页导入文章并生成卡片</p>
+                <button
+                  onClick={onCreate}
+                  className="mt-4 px-4 py-2 bg-primary text-white rounded-2xl shadow-[0_4px_0_0_#46a302] active:translate-y-1"
+                >
+                  去生成
+                </button>
+              </div>
+            ) : (
+              <LearningPath nodes={pathNodes} onNodeClick={handleNodeClick} />
+            )}
+          </section>
         )}
-      </main>
+      </div>
 
-      <ArticleInput
-        isOpen={showInput}
-        onClose={() => setShowInput(false)}
-        onSuccess={loadData}
-      />
-
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
-
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        initialMode={authModalMode}
-      />
+      <button
+        onClick={onCreate}
+        className="fixed bottom-24 right-6 w-14 h-14 rounded-2xl bg-secondary text-white shadow-[0_8px_0_0_#245aa3] flex items-center justify-center active:translate-y-1"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
     </div>
   );
 }
