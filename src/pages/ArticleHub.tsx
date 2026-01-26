@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, FileText, HelpCircle, Layers, MessageCircle, Sparkles, Tv, Users, X } from 'lucide-react';
+import { ChevronLeft, FileText, HelpCircle, Layers, MessageCircle, Tv, Users, X } from 'lucide-react';
 import {
   createCards,
   createDialogueMessages,
@@ -9,12 +9,13 @@ import {
   getCards,
   getDialogueMessages,
   getGalgameMessages,
+  getProgress,
   getQuizQuestions,
   getArticlesCacheSnapshot,
 } from '../services/dataService';
 import { AIResponseParseError, convertToDialogue, convertToGalgame, generateQuizQuestions, isConfigured, splitArticle } from '../services/openai';
 import { OriginalTextView } from '../components/OriginalTextView';
-import type { Article } from '../types';
+import type { Article, LearningProgress } from '../types';
 
 type Mode = 'card' | 'dialogue' | 'galgame' | 'quiz';
 
@@ -37,6 +38,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
   const [dialogueCount, setDialogueCount] = useState(cachedArticle?.messageCount || 0);
   const [galgameCount, setGalgameCount] = useState(cachedArticle?.galgameMessageCount || 0);
   const [quizCount, setQuizCount] = useState(cachedArticle?.quizCount || 0);
+  const [progress, setProgress] = useState<LearningProgress | null>(null);
   const [isLoading, setIsLoading] = useState(!cachedArticle);
   const [showOriginal, setShowOriginal] = useState(false);
   const [error, setError] = useState('');
@@ -70,15 +72,17 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
 
   const loadCounts = async () => {
     try {
-      const [cards, dialogues, galgames] = await Promise.all([
+      const [cards, dialogues, galgames, progressData, quizzes] = await Promise.all([
         getCards(articleId),
         getDialogueMessages(articleId),
         getGalgameMessages(articleId),
+        getProgress(articleId),
+        getQuizQuestions(articleId),
       ]);
       setCardCount(cards.length);
       setDialogueCount(dialogues.length);
       setGalgameCount(galgames.length);
-      const quizzes = await getQuizQuestions(articleId);
+      setProgress(progressData);
       setQuizCount(quizzes.length);
     } catch (err) {
       console.error('Failed to load mode counts:', err);
@@ -113,6 +117,10 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
     }
     return true;
   };
+
+  const progressPercent = cardCount > 0
+    ? Math.min(100, Math.round((((progress?.current_index ?? -1) + 1) / cardCount) * 100))
+    : 0;
 
   const handleGenerateCards = async () => {
     if (!article || !ensureConfigured()) return;
@@ -239,177 +247,144 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <header className="bg-white/90 backdrop-blur border-b border-slate-100 sticky top-0 z-10">
+        <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <ChevronLeft className="w-5 h-5 text-slate-600" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold text-gray-900 truncate">{article.title}</h1>
-            <p className="text-xs text-gray-500">导入时间：{new Date(article.created_at).toLocaleDateString()}</p>
+            <h1 className="text-lg font-semibold text-slate-900 truncate">{article.title}</h1>
+            <p className="text-xs text-slate-500">导入时间：{new Date(article.created_at).toLocaleDateString()}</p>
           </div>
           <button
             onClick={() => setShowOriginal(true)}
-            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
           >
             查看原文
           </button>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <main className="max-w-md mx-auto px-4 py-6 space-y-6">
         {isGenerating && (
-          <div className="p-4 bg-teal-50 text-teal-700 rounded-xl text-sm flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <div className="p-4 bg-primary/10 text-primary rounded-2xl text-sm flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             {processingStatus || '处理中...'}
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-              <FileText className="w-5 h-5 text-amber-600" />
-            </div>
+        <section className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">原文入口</h2>
-              <p className="text-xs text-gray-500">随时查看原文并进行标注</p>
+              <p className="text-xs text-slate-400">学习进度</p>
+              <p className="text-lg font-semibold text-slate-800 mt-1">
+                {progress?.current_index !== undefined ? progress.current_index + 1 : 0} / {cardCount}
+              </p>
             </div>
+            <span className="text-sm font-semibold text-primary">{progressPercent}%</span>
           </div>
-          <button
-            onClick={() => setShowOriginal(true)}
-            className="w-full py-2.5 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition-colors"
-          >
-            打开原文
-          </button>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
-              <HelpCircle className="w-5 h-5 text-violet-600" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">问答模式</h2>
-              <p className="text-xs text-gray-500">{quizCount > 0 ? `已生成 ${quizCount} 道题目` : '未生成问答题'}</p>
-            </div>
+          <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full" style={{ width: `${progressPercent}%` }} />
           </div>
-          {quizCount > 0 ? (
-            <button
-              onClick={() => onOpenMode('quiz')}
-              className="w-full py-2.5 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors"
-            >
-              开始答题
-            </button>
-          ) : (
-            <button
-              onClick={handleGenerateQuiz}
-              disabled={isGenerating}
-              className="w-full py-2.5 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors disabled:bg-gray-300"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                生成单选题
-              </span>
-            </button>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-              <Layers className="w-5 h-5 text-teal-600" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">卡片模式</h2>
-              <p className="text-xs text-gray-500">{cardCount > 0 ? `已生成 ${cardCount} 张卡片` : '未生成卡片'}</p>
-            </div>
-          </div>
-          {cardCount > 0 ? (
-            <button
-              onClick={() => onOpenMode('card')}
-              className="w-full py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors"
-            >
-              进入卡片学习
-            </button>
-          ) : (
-            <button
-              onClick={handleGenerateCards}
-              disabled={isGenerating}
-              className="w-full py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-300"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
+          <div className="mt-4 flex gap-3">
+            {cardCount > 0 ? (
+              <button
+                onClick={() => onOpenMode('card')}
+                className="flex-1 py-3 bg-primary text-white rounded-2xl font-semibold shadow-[0_4px_0_0_#46a302] active:translate-y-1"
+              >
+                继续学习
+              </button>
+            ) : (
+              <button
+                onClick={handleGenerateCards}
+                disabled={isGenerating}
+                className="flex-1 py-3 bg-primary text-white rounded-2xl font-semibold shadow-[0_4px_0_0_#46a302] disabled:bg-slate-300"
+              >
                 生成卡片
-              </span>
+              </button>
+            )}
+            <button
+              onClick={() => setShowOriginal(true)}
+              className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-2xl font-semibold"
+            >
+              阅读原文
             </button>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-              <MessageCircle className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">群聊模式</h2>
-              <p className="text-xs text-gray-500">{dialogueCount > 0 ? `已生成 ${dialogueCount} 条对话` : '未生成群聊'}</p>
-            </div>
           </div>
-          {dialogueCount > 0 ? (
-            <button
-              onClick={() => onOpenMode('dialogue')}
-              className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors"
-            >
-              进入群聊学习
-            </button>
-          ) : (
-            <button
-              onClick={() => openCharacterModal('dialogue')}
-              disabled={isGenerating}
-              className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors disabled:bg-gray-300"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                生成群聊
-              </span>
-            </button>
-          )}
-        </div>
+        </section>
 
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-cyan-100 rounded-xl flex items-center justify-center">
-              <Tv className="w-5 h-5 text-cyan-600" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">视觉小说模式</h2>
-              <p className="text-xs text-gray-500">{galgameCount > 0 ? `已生成 ${galgameCount} 句台词` : '未生成视觉小说'}</p>
-            </div>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-800">模式入口</h2>
+            <span className="text-xs text-slate-400">点击进入或生成</span>
           </div>
-          {galgameCount > 0 ? (
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
             <button
-              onClick={() => onOpenMode('galgame')}
-              className="w-full py-2.5 bg-cyan-600 text-white rounded-xl font-medium hover:bg-cyan-700 transition-colors"
+              onClick={() => setShowOriginal(true)}
+              className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
             >
-              进入视觉小说
+              <FileText className="w-6 h-6 text-amber-500" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">原文阅读</p>
+              <p className="text-xs text-slate-400 mt-1">随时查看原文</p>
+              <span className="mt-3 inline-flex text-xs font-semibold text-amber-600">打开</span>
             </button>
-          ) : (
+
             <button
-              onClick={() => openCharacterModal('galgame')}
-              disabled={isGenerating}
-              className="w-full py-2.5 bg-cyan-600 text-white rounded-xl font-medium hover:bg-cyan-700 transition-colors disabled:bg-gray-300"
+              onClick={() => (quizCount > 0 ? onOpenMode('quiz') : handleGenerateQuiz())}
+              disabled={isGenerating && quizCount === 0}
+              className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
             >
-              <span className="inline-flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                生成视觉小说
+              <HelpCircle className="w-6 h-6 text-violet-600" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">问答模式</p>
+              <p className="text-xs text-slate-400 mt-1">{quizCount > 0 ? `${quizCount} 道题目` : '未生成'}</p>
+              <span className="mt-3 inline-flex text-xs font-semibold text-violet-600">
+                {quizCount > 0 ? '进入' : '生成'}
               </span>
             </button>
-          )}
-        </div>
+
+            <button
+              onClick={() => (cardCount > 0 ? onOpenMode('card') : handleGenerateCards())}
+              disabled={isGenerating && cardCount === 0}
+              className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
+            >
+              <Layers className="w-6 h-6 text-primary" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">卡片模式</p>
+              <p className="text-xs text-slate-400 mt-1">{cardCount > 0 ? `${cardCount} 张卡片` : '未生成'}</p>
+              <span className="mt-3 inline-flex text-xs font-semibold text-primary">
+                {cardCount > 0 ? '进入' : '生成'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => (dialogueCount > 0 ? onOpenMode('dialogue') : openCharacterModal('dialogue'))}
+              disabled={isGenerating && dialogueCount === 0}
+              className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
+            >
+              <MessageCircle className="w-6 h-6 text-emerald-600" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">群聊模式</p>
+              <p className="text-xs text-slate-400 mt-1">{dialogueCount > 0 ? `${dialogueCount} 条对话` : '未生成'}</p>
+              <span className="mt-3 inline-flex text-xs font-semibold text-emerald-600">
+                {dialogueCount > 0 ? '进入' : '生成'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => (galgameCount > 0 ? onOpenMode('galgame') : openCharacterModal('galgame'))}
+              disabled={isGenerating && galgameCount === 0}
+              className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
+            >
+              <Tv className="w-6 h-6 text-cyan-600" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">Galgame</p>
+              <p className="text-xs text-slate-400 mt-1">{galgameCount > 0 ? `${galgameCount} 句台词` : '未生成'}</p>
+              <span className="mt-3 inline-flex text-xs font-semibold text-cyan-600">
+                {galgameCount > 0 ? '进入' : '生成'}
+              </span>
+            </button>
+          </div>
+        </section>
       </main>
 
       <OriginalTextView

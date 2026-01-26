@@ -10,6 +10,7 @@ import { idbGet } from '../services/localAssetStore';
 interface DialogueReaderProps {
   article: Article;
   onBack: () => void;
+  embedded?: boolean;
 }
 
 function generateAvatarColor(seed: string): string {
@@ -28,7 +29,7 @@ function getInitials(name: string): string {
   return name.slice(0, 1).toUpperCase();
 }
 
-export function DialogueReader({ article, onBack }: DialogueReaderProps) {
+export function DialogueReader({ article, onBack, embedded = false }: DialogueReaderProps) {
   const [messages, setMessages] = useState<DialogueMessage[]>([]);
   const [qas, setQAs] = useState<DialogueQA[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -172,8 +173,11 @@ export function DialogueReader({ article, onBack }: DialogueReaderProps) {
     : [];
 
   if (isLoading) {
+    const loadingClass = embedded
+      ? 'flex-1 bg-gray-100 flex items-center justify-center'
+      : 'min-h-screen bg-gray-100 flex items-center justify-center';
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className={loadingClass}>
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="mt-4 text-gray-500">加载中...</p>
@@ -182,37 +186,41 @@ export function DialogueReader({ article, onBack }: DialogueReaderProps) {
     );
   }
 
+  const containerClass = embedded ? 'flex-1 bg-gray-100 flex' : 'min-h-screen bg-gray-100 flex';
+
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className={containerClass}>
       <div className={`flex-1 flex flex-col transition-all duration-300 ${showQAPanel ? 'mr-80' : ''}`}>
-        <header className="bg-[#ededed] border-b border-gray-200 sticky top-0 z-10">
-          <div className="flex items-center justify-between px-4 py-3">
-            <button
-              onClick={onBack}
-              className="p-2 -ml-2 hover:bg-gray-200 rounded-full transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-700" />
-            </button>
-            <div className="text-center">
-              <h1 className="font-medium text-gray-900 text-sm">{article.title}</h1>
-              <p className="text-xs text-gray-500">{messages.length} 条消息</p>
+        {!embedded && (
+          <header className="bg-[#ededed] border-b border-gray-200 sticky top-0 z-10">
+            <div className="flex items-center justify-between px-4 py-3">
+              <button
+                onClick={onBack}
+                className="p-2 -ml-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-700" />
+              </button>
+              <div className="text-center">
+                <h1 className="font-medium text-gray-900 text-sm">{article.title}</h1>
+                <p className="text-xs text-gray-500">{messages.length} 条消息</p>
+              </div>
+              <button
+                onClick={() => setShowOriginalText(true)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-700"
+              >
+                <FileText className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowQAPanel(!showQAPanel)}
+                className={`p-2 -mr-2 rounded-full transition-colors ${
+                  showQAPanel ? 'bg-teal-100 text-teal-600' : 'hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                <MessageCircle className="w-5 h-5" />
+              </button>
             </div>
-            <button
-              onClick={() => setShowOriginalText(true)}
-              className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-700"
-            >
-              <FileText className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setShowQAPanel(!showQAPanel)}
-              className={`p-2 -mr-2 rounded-full transition-colors ${
-                showQAPanel ? 'bg-teal-100 text-teal-600' : 'hover:bg-gray-200 text-gray-700'
-              }`}
-            >
-              <MessageCircle className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
+          </header>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           <div className="text-center py-2">

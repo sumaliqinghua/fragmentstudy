@@ -3,32 +3,31 @@ import { Home } from './pages/Home';
 import { ArticleHub } from './pages/ArticleHub';
 import { CardReader } from './pages/CardReader';
 import { QuizReader } from './pages/QuizReader';
-import { DialogueReader } from './components/DialogueReader';
-import { GalgameReader } from './components/GalgameReader';
 import { WelcomeModal } from './components/WelcomeModal';
 import { AuthModal } from './components/AuthModal';
 import { BottomTabBar, type TabKey } from './components/BottomTabBar';
 import { Create } from './pages/Create';
 import { Profile } from './pages/Profile';
 import { ReaderPlaceholder } from './pages/ReaderPlaceholder';
+import { ReaderPage, type ReaderMode } from './pages/ReaderPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { getArticle, getArticlesCacheSnapshot } from './services/dataService';
-import type { Article } from './types';
+import { getArticlesCacheSnapshot } from './services/dataService';
 
 const WELCOME_DISMISSED_KEY = 'welcome_dismissed';
 
-type ReaderMode = 'card' | 'dialogue' | 'galgame' | 'quiz';
+type ExtendedReaderMode = ReaderMode | 'card' | 'quiz';
 type View =
   | { tab: 'home'; articleId?: string }
   | { tab: 'create' }
-  | { tab: 'reader'; articleId?: string; mode?: ReaderMode }
+  | { tab: 'reader'; articleId?: string; mode?: ExtendedReaderMode }
   | { tab: 'profile' };
 
 function AppContent() {
   const { isLoading: authLoading, isGuest } = useAuth();
   const [view, setView] = useState<View>({ tab: 'home' });
-  const [article, setArticle] = useState<Article | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [lastArticleId, setLastArticleId] = useState<string | null>(
+    getArticlesCacheSnapshot()?.[0]?.id || null
+  );
   const [showWelcome, setShowWelcome] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -43,29 +42,16 @@ function AppContent() {
   }, [authLoading, isGuest]);
 
   useEffect(() => {
-    if (view.tab === 'reader' && view.mode && view.mode !== 'card' && view.mode !== 'quiz') {
-      const cachedArticle =
-        getArticlesCacheSnapshot()?.find((item) => item.id === view.articleId) || null;
-      if (cachedArticle) {
-        setArticle(cachedArticle);
-        setIsLoading(false);
-      } else {
-        setIsLoading(true);
+    if (!lastArticleId) {
+      const cached = getArticlesCacheSnapshot();
+      if (cached?.[0]?.id) {
+        setLastArticleId(cached[0].id);
       }
-      if (view.articleId) {
-        getArticle(view.articleId)
-          .then(setArticle)
-          .finally(() => setIsLoading(false));
-      }
-    } else {
-      setArticle(null);
-      setIsLoading(false);
     }
-  }, [view]);
+  }, [lastArticleId]);
 
   const handleBackToHome = () => {
     setView({ tab: 'home' });
-    setArticle(null);
   };
 
   const handleBackToArticle = () => {
@@ -108,7 +94,11 @@ function AppContent() {
       setView({ tab: 'profile' });
       return;
     }
-    setView({ tab: 'reader' });
+    if (lastArticleId) {
+      setView({ tab: 'reader', articleId: lastArticleId, mode: 'original' });
+    } else {
+      setView({ tab: 'reader' });
+    }
   };
 
   if (authLoading) {
@@ -122,30 +112,11 @@ function AppContent() {
     );
   }
 
-  if (view.tab === 'reader' && view.mode) {
-    if (view.mode === 'card') {
-      return <CardReader articleId={view.articleId!} onBack={handleBackToArticle} />;
-    }
-    if (view.mode === 'quiz') {
-      return <QuizReader articleId={view.articleId!} onBack={handleBackToArticle} />;
-    }
-
-    if (isLoading || !article) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="mt-4 text-gray-500">加载中...</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (view.mode === 'dialogue') {
-      return <DialogueReader article={article} onBack={handleBackToArticle} />;
-    }
-
-    return <GalgameReader article={article} onBack={handleBackToArticle} />;
+  if (view.tab === 'reader' && view.mode === 'card') {
+    return <CardReader articleId={view.articleId!} onBack={handleBackToArticle} />;
+  }
+  if (view.tab === 'reader' && view.mode === 'quiz') {
+    return <QuizReader articleId={view.articleId!} onBack={handleBackToArticle} />;
   }
 
   if (view.tab === 'home' && view.articleId) {
@@ -153,7 +124,10 @@ function AppContent() {
       <ArticleHub
         articleId={view.articleId}
         onBack={handleBackToHome}
-        onOpenMode={(mode) => setView({ tab: 'reader', articleId: view.articleId, mode })}
+        onOpenMode={(mode) => {
+          setLastArticleId(view.articleId);
+          setView({ tab: 'reader', articleId: view.articleId, mode });
+        }}
       />
     );
   }
@@ -164,13 +138,35 @@ function AppContent() {
     <>
       {view.tab === 'home' && (
         <Home
-          onSelectArticle={(id) => setView({ tab: 'home', articleId: id })}
+          onSelectArticle={(id) => {
+            setLastArticleId(id);
+            setView({ tab: 'home', articleId: id });
+          }}
           onCreate={() => setView({ tab: 'create' })}
         />
       )}
-      {view.tab === 'create' && <Create onBack={() => setView({ tab: 'home' })} />}
+      {view.tab === 'create' && (
+        <Create
+          onBack={() => setView({ tab: 'home' })}
+          onSelectArticle={(id) => {
+            setLastArticleId(id);
+            setView({ tab: 'home', articleId: id });
+          }}
+        />
+      )}
       {view.tab === 'profile' && <Profile />}
-      {view.tab === 'reader' && <ReaderPlaceholder onBack={() => setView({ tab: 'home' })} />}
+      {view.tab === 'reader' && view.articleId && view.mode && view.mode !== 'card' && view.mode !== 'quiz' && (
+        <ReaderPage
+          articleId={view.articleId}
+          initialMode={view.mode as ReaderMode}
+          onBack={() => setView({ tab: 'home' })}
+          onOpenHub={() => setView({ tab: 'home', articleId: view.articleId })}
+          onStartQuiz={() => setView({ tab: 'reader', articleId: view.articleId, mode: 'quiz' })}
+        />
+      )}
+      {view.tab === 'reader' && (!view.articleId || !view.mode) && (
+        <ReaderPlaceholder onBack={() => setView({ tab: 'home' })} />
+      )}
       <BottomTabBar activeTab={activeTab} onChange={handleTabChange} />
       <WelcomeModal
         isOpen={showWelcome}

@@ -85,6 +85,30 @@ body {
   background-color: #f8fafc;
 }
 
+.interactive-word {
+  cursor: pointer;
+  border-bottom: 2px solid #e5e5e5;
+  transition: all 0.2s ease;
+  padding: 0 2px;
+}
+
+.active-word {
+  background-color: #fef08a;
+  color: #0f172a;
+  border-bottom: 2px solid #fbbf24;
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+.highlight-sentence {
+  background-color: #f0fdf4;
+  border-left: 4px solid #58cc02;
+  padding-left: 12px;
+  display: block;
+  margin: 1.5rem 0;
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -115,4 +139,13 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

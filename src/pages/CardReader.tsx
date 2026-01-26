@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, Keyboard } from 'lucide-react';
+import { MoreHorizontal, X, RotateCcw, Check } from 'lucide-react';
 import {
   getArticle,
   getCards,
@@ -9,7 +9,6 @@ import {
   claimReward,
   getBookmarks,
   toggleBookmark,
-  getConversationCount,
   getAllHighlights,
 } from '../services/dataService';
 import { CardStack } from '../components/CardStack';
@@ -18,6 +17,7 @@ import { TreasureBox } from '../components/TreasureBox';
 import { ContextPreview } from '../components/ContextPreview';
 import { OriginalTextView } from '../components/OriginalTextView';
 import { AIChat } from '../components/AIChat';
+import { ActionMenu } from '../components/ActionMenu';
 import type { Article, Card, Highlight } from '../types';
 
 interface CardReaderProps {
@@ -33,13 +33,13 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [claimedMilestones, setClaimedMilestones] = useState<number[]>([]);
   const [bookmarkedCards, setBookmarkedCards] = useState<Set<string>>(new Set());
-  const [conversationCount, setConversationCount] = useState(0);
   const [highlightsMap, setHighlightsMap] = useState<Map<string, Highlight[]>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   const [showContextPreview, setShowContextPreview] = useState(false);
   const [showOriginalText, setShowOriginalText] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const [pendingMilestone, setPendingMilestone] = useState<30 | 60 | 80 | null>(null);
 
   useEffect(() => {
@@ -48,13 +48,12 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
 
   const loadData = async () => {
     try {
-      const [articleData, cardsData, progressData, rewardsData, bookmarksData, convCount, highlights] = await Promise.all([
+      const [articleData, cardsData, progressData, rewardsData, bookmarksData, highlights] = await Promise.all([
         getArticle(articleId),
         getCards(articleId),
         getProgress(articleId),
         getRewards(articleId),
         getBookmarks(articleId),
-        getConversationCount(articleId),
         getAllHighlights(articleId),
       ]);
 
@@ -63,7 +62,6 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
       setCurrentIndex(progressData?.current_index || 0);
       setClaimedMilestones(rewardsData.map(r => r.milestone));
       setBookmarkedCards(new Set(bookmarksData));
-      setConversationCount(convCount);
       setHighlightsMap(highlights);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -72,13 +70,8 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
     }
   };
 
-  const refreshConversationCount = async () => {
-    try {
-      const count = await getConversationCount(articleId);
-      setConversationCount(count);
-    } catch (error) {
-      console.error('Failed to refresh conversation count:', error);
-    }
+  const handleConversationSaved = () => {
+    return;
   };
 
   const checkMilestone = useCallback((index: number) => {
@@ -201,49 +194,68 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
   const currentHighlights = highlightsMap.get(currentCard?.id || '') || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex flex-col">
-      <header className="shrink-0 bg-white/80 backdrop-blur-sm border-b border-gray-100 px-4 py-3">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-3 mb-3">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <header className="shrink-0 px-4 pt-6 pb-2">
+        <div className="max-w-md mx-auto">
+          <div className="flex items-center justify-between">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
+              className="flex items-center justify-center size-10 rounded-full hover:bg-slate-100 transition-colors text-slate-400"
             >
-              <ChevronLeft className="w-6 h-6 text-gray-700" />
+              <X className="w-6 h-6" />
             </button>
-            <h1 className="text-lg font-semibold text-gray-900 truncate flex-1">
-              {article.title}
-            </h1>
+            <div className="flex-1 mx-4">
+              <ProgressBar
+                current={currentIndex}
+                total={cards.length}
+                claimedMilestones={claimedMilestones}
+              />
+            </div>
+            <button
+              onClick={() => setShowActions(true)}
+              className="flex items-center justify-center size-10 rounded-full hover:bg-slate-100 transition-colors text-slate-400"
+            >
+              <MoreHorizontal className="w-5 h-5" />
+            </button>
           </div>
-
-          <ProgressBar
-            current={currentIndex}
-            total={cards.length}
-            claimedMilestones={claimedMilestones}
-          />
+          <h1 className="mt-3 text-sm font-semibold text-slate-700 truncate text-center">
+            {article.title}
+          </h1>
         </div>
       </header>
 
       <CardStack
         cards={cards}
         currentIndex={currentIndex}
-        isBookmarked={bookmarkedCards.has(currentCard?.id || '')}
-        conversationCount={conversationCount}
         highlights={currentHighlights}
         onNext={handleNext}
         onPrev={handlePrev}
         onLongPress={() => setShowContextPreview(true)}
-        onViewOriginal={() => setShowOriginalText(true)}
-        onToggleBookmark={handleToggleBookmark}
-        onAskAI={() => setShowAIChat(true)}
         onHighlightAdded={handleHighlightAdded}
       />
 
-      <footer className="shrink-0 pb-4 pt-1 px-4">
-        <div className="max-w-md mx-auto flex items-center justify-center gap-1 text-xs text-gray-400">
-          <Keyboard className="w-3.5 h-3.5" />
-          <span>方向键切换卡片</span>
-        </div>
+      <footer className="shrink-0 pb-10 pt-4 px-6 flex justify-center items-center gap-6">
+        <button
+          aria-label="Skip"
+          onClick={handleNext}
+          className="flex items-center justify-center size-14 rounded-full bg-white border-2 border-slate-200 text-slate-300 shadow-sm hover:border-rose-400 hover:text-rose-500 transition-all"
+        >
+          <X className="w-6 h-6" />
+        </button>
+        <button
+          aria-label="Previous"
+          onClick={handlePrev}
+          className="flex items-center justify-center size-11 rounded-full bg-transparent text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
+        >
+          <RotateCcw className="w-5 h-5" />
+        </button>
+        <button
+          aria-label="Mastered"
+          onClick={handleNext}
+          className="flex items-center justify-center size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary-dark transition-all"
+        >
+          <Check className="w-6 h-6" />
+        </button>
       </footer>
 
       <ContextPreview
@@ -272,7 +284,25 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
         currentCard={currentCard}
         previousCards={previousCards}
         onClose={() => setShowAIChat(false)}
-        onConversationSaved={refreshConversationCount}
+        onConversationSaved={handleConversationSaved}
+      />
+
+      <ActionMenu
+        isOpen={showActions}
+        isBookmarked={bookmarkedCards.has(currentCard?.id || '')}
+        onClose={() => setShowActions(false)}
+        onViewOriginal={() => {
+          setShowActions(false);
+          setShowOriginalText(true);
+        }}
+        onToggleBookmark={() => {
+          setShowActions(false);
+          handleToggleBookmark();
+        }}
+        onAskAI={() => {
+          setShowActions(false);
+          setShowAIChat(true);
+        }}
       />
 
       <TreasureBox

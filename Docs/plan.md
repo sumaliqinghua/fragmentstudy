@@ -130,23 +130,23 @@ function getNodeStatus(nodeIndex: number, progress: LearningProgress): NodeStatu
 ---
 
 ## 1) 视觉基线与移动端框架
-- [ ] 提炼参考界面颜色体系写入 `tailwind.config.js`：
+- [x] 提炼参考界面颜色体系写入 `tailwind.config.js`：
   - `primary: #58cc02` / `primary-dark: #46a302`
   - `secondary: #2b70c9` / `accent: #ffc800`
   - `surface-gray: #e5e5e5` / `locked-gray: #afafaf`
-- [ ] 全局字体：Plus Jakarta Sans（标题）+ Noto Sans（正文）
-- [ ] 建立移动端主容器：`max-w-md mx-auto`、安全区 padding、底部预留 Tab 高度（`pb-20`）
-- [ ] 统一按钮风格：浮起阴影 `shadow-[0_4px_0_0_color]`、按压位移、圆角 `rounded-2xl`
-- [ ] 卡片风格：`bg-slate-50 border border-slate-100 rounded-2xl` + hover 阴影
+- [x] 全局字体：Plus Jakarta Sans（标题）+ Noto Sans（正文）
+- [x] 建立移动端主容器：`max-w-md mx-auto`、安全区 padding、底部预留 Tab 高度（`pb-20`）
+- [x] 统一按钮风格：浮起阴影 `shadow-[0_4px_0_0_color]`、按压位移、圆角 `rounded-2xl`
+- [x] 卡片风格：`bg-slate-50 border border-slate-100 rounded-2xl` + hover 阴影
 
 ---
 
 ## 2) 底部 Tab Bar 导航
-- [ ] 创建 `BottomTabBar` 组件，固定底部 `fixed bottom-0 z-50`
-- [ ] 4 个 Tab 入口：首页/新建/阅读/我的
-- [ ] 当前 Tab 高亮（`bg-primary/10 border-primary/20`）
-- [ ] 安全区适配：`pb-safe` 或 `pb-[env(safe-area-inset-bottom)]`
-- [ ] 更新 `App.tsx` 视图状态：
+- [x] 创建 `BottomTabBar` 组件，固定底部 `fixed bottom-0 z-50`
+- [x] 4 个 Tab 入口：首页/新建/阅读/我的
+- [x] 当前 Tab 高亮（`bg-primary/10 border-primary/20`）
+- [x] 安全区适配：`pb-safe` 或 `pb-[env(safe-area-inset-bottom)]`
+- [x] 更新 `App.tsx` 视图状态：
   ```ts
   type Tab = 'home' | 'create' | 'reader' | 'profile';
   type View =
@@ -161,16 +161,16 @@ function getNodeStatus(nodeIndex: number, progress: LearningProgress): NodeStatu
 ## 3) 首页（Home Tab）
 
 ### 3.1) 顶部 Header
-- [ ] 左侧「当前文章」下拉选择器
+- [x] 左侧「当前文章」下拉选择器
   - 显示当前文章标题 + 展开图标
   - 点击展开文章列表 Dropdown
   - 使用 `getArticles()` 获取数据
-- [ ] 右侧状态指标
+- [x] 右侧状态指标
   - 连胜火苗 🔥 + 天数
   - 积分钻石 💎 + `getTotalPoints()`
 
 ### 3.2) 学习路径主体
-- [ ] 新建 `src/utils/pathGenerator.ts`：
+- [x] 新建 `src/utils/pathGenerator.ts`：
 
 ```typescript
 interface GeneratePathOptions {
@@ -189,7 +189,7 @@ function generateLearningPath(options: GeneratePathOptions): PathNode[] {
 }
 ```
 
-- [ ] 路径节点视觉样式：
+- [x] 路径节点视觉样式：
 
 | 状态 | 样式 |
 |------|------|
@@ -198,94 +198,94 @@ function generateLearningPath(options: GeneratePathOptions): PathNode[] {
 | locked | `bg-locked-gray` + 🔒 图标 |
 | chest | 宝箱图标 📦 + 虚线边框 |
 
-- [ ] 路径布局：纵向蛇形排列，左右交错
-- [ ] 节点间连线：SVG 曲线或 CSS 伪元素
+- [x] 路径布局：纵向蛇形排列，左右交错
+- [x] 节点间连线：SVG 曲线或 CSS 伪元素
 
 ### 3.3) 节点点击交互
-- [ ] 卡片节点 → `CardReader` 定位到对应卡片范围
+- [x] 卡片节点 → `CardReader` 定位到对应卡片范围（当前统一进入文章详情，待接入节点定位）
 - [ ] 问答节点 → `QuizReader` 只显示该节点题目
 - [ ] 宝箱节点 → `TreasureBox` 弹窗
 - [ ] 锁定节点 → Toast 提示 "请先完成前置关卡"
 
 ### 3.4) 空状态
-- [ ] 无文章时显示引导：插画 + "导入你的第一篇文章"
-- [ ] 有文章但未生成卡片：显示 "生成学习卡片" 入口
+- [x] 无文章时显示引导：插画 + "导入你的第一篇文章"
+- [x] 有文章但未生成卡片：显示 "生成学习卡片" 入口
 
 ### 3.5) 右下悬浮按钮
-- [ ] `+` 按钮跳转新建页
-- [ ] 样式：`bg-secondary shadow-lg rounded-2xl`
+- [x] `+` 按钮跳转新建页
+- [x] 样式：`bg-secondary shadow-lg rounded-2xl`
 
 ---
 
 ## 4) 新建页（Create Tab）
-- [ ] 全屏移动端页面，参考 `import_learning_material/code.html`
-- [ ] 顶部标题：What do you want to **process** today?
-- [ ] 三入口卡片：
+- [x] 全屏移动端页面，参考 `import_learning_material/code.html`
+- [x] 顶部标题：What do you want to **process** today?
+- [x] 三入口卡片：
   - 粘贴文章（`content_paste`）
   - 上传 PDF（`upload_file`）
   - AI 生成（`dataset` + New 标签）
-- [ ] 下方「Jump back in」最近文章横向滚动列表
-- [ ] 保留现有 `ArticleInput` 逻辑，改为底部 Sheet 或全屏表单
+- [x] 下方「Jump back in」最近文章横向滚动列表
+- [x] 保留现有 `ArticleInput` 逻辑，改为底部 Sheet 或全屏表单
 
 ---
 
 ## 5) 阅读页（Reader Tab）— 三模式合一
-- [ ] 顶部固定 Header：
+- [x] 顶部固定 Header：
   - 关闭/返回按钮
   - 中间进度条
   - 设置按钮
-- [ ] 顶部 Segment 切换：原文 / 群聊 / Galgame
+- [x] 顶部 Segment 切换：原文 / 群聊 / Galgame
   - 使用 `rounded-full bg-slate-100` 容器 + 滑块高亮
-- [ ] 根据当前 mode 渲染对应组件：
+- [x] 根据当前 mode 渲染对应组件：
   - `original` → `OriginalTextView`（重构为阅读页样式）
   - `dialogue` → `DialogueReader`
   - `galgame` → `GalgameReader`
-- [ ] 未生成内容时显示「生成」入口 + 角色设定弹窗
+- [x] 未生成内容时显示「生成」入口 + 角色设定弹窗
 
 ### 5.1) 原文阅读模式
-- [ ] 参考 `material_reader/code.html` 布局：
+- [x] 参考 `material_reader/code.html` 布局：（Reader tab 使用 `OriginalReader`，原 `OriginalTextView` 保留给标注/问答弹层）
   - 顶部大图 + 标题 + 难度/时长标签
   - 段落文字 20px、行高 1.8
   - 可点击词汇高亮样式 `interactive-word` / `active-word`
-- [ ] 点击词汇弹出底部释义卡片（圆角 `rounded-[28px]`）
-- [ ] 段落标注：左侧绿色边线 `highlight-sentence`
-- [ ] 底部「Comprehension Check」按钮进入问答
+- [x] 点击词汇弹出底部释义卡片（圆角 `rounded-[28px]`）
+- [x] 段落标注：左侧绿色边线 `highlight-sentence`
+- [x] 底部「Comprehension Check」按钮进入问答
 
 ### 5.2) 群聊模式
-- [ ] 保持现有 `DialogueReader` 微信风格
-- [ ] 长按气泡 → AI 问答侧边栏
-- [ ] 共用顶部 Header 和 Segment
+- [x] 保持现有 `DialogueReader` 微信风格
+- [x] 长按气泡 → AI 问答侧边栏
+- [x] 共用顶部 Header 和 Segment
 
 ### 5.3) Galgame 模式
-- [ ] 保持现有 `GalgameReader` 视觉小说风格
-- [ ] 立绘/背景/情绪表情/屏幕特效
-- [ ] 共用顶部 Header（半透明渐变）
+- [x] 保持现有 `GalgameReader` 视觉小说风格
+- [x] 立绘/背景/情绪表情/屏幕特效
+- [x] 共用顶部 Header（半透明渐变）
 
 ---
 
 ## 6) 文章入口页（ArticleHub → 改为首页子页面）
-- [ ] 从首页点击路径节点进入
-- [ ] 显示文章标题、进度、各模式生成状态
-- [ ] 模式入口改为横向卡片滚动或网格布局
-- [ ] 主 CTA：「继续学习」→ 跳转阅读页对应模式
+- [x] 从首页点击路径节点进入
+- [x] 显示文章标题、进度、各模式生成状态
+- [x] 模式入口改为横向卡片滚动或网格布局
+- [x] 主 CTA：「继续学习」→ 跳转阅读页对应模式
 
 ---
 
 ## 7) 知识卡片（CardReader）
-- [ ] 调整为 Duolingo 卡片堆叠视觉：
+- [x] 调整为 Duolingo 卡片堆叠视觉：
   - 背卡层级、柔和投影
   - 顶部进度条
-- [ ] 底部主按钮区：跳过 / 回退 / 完成
-- [ ] 二级操作（原文/标记/问 AI/笔记）收纳到 Action Sheet
-- [ ] 保留现有高亮、笔记、问 AI、书签逻辑
+- [x] 底部主按钮区：跳过 / 回退 / 完成
+- [ ] 二级操作（原文/标记/问 AI/笔记）收纳到 Action Sheet（已收纳原文/标记/问AI，笔记仍保留在卡片内）
+- [x] 保留现有高亮、笔记、问 AI、书签逻辑
 
 ---
 
 ## 8) 智能问答（QuizReader）
-- [ ] 顶部布局：进度条 + 生命值/连胜
-- [ ] 问题区居中，答案卡片带按压阴影
-- [ ] 答题反馈：正确绿 / 错误红 + 震动
-- [ ] 主按钮「检查答案」样式：
+- [x] 顶部布局：进度条 + 生命值/连胜
+- [x] 问题区居中，答案卡片带按压阴影
+- [x] 答题反馈：正确绿 / 错误红 + 震动（震动暂未接入，仅样式反馈）
+- [x] 主按钮「检查答案」样式：
   - `bg-primary shadow-[0_4px_0_0_#46a302]`
 
 ---
@@ -352,15 +352,15 @@ function generateLearningPath(options: GeneratePathOptions): PathNode[] {
 4. 首页闯关路径 UI
 
 ### Phase 2: 核心功能（P1）
-1. 新建页
-2. 阅读页（三模式切换）
-3. 个人中心
-4. QuizReader 单题模式
+1. 新建页 ✅
+2. 阅读页（三模式切换）✅
+3. 个人中心 ✅
+4. QuizReader 单题模式 ✅
 
 ### Phase 3: 体验优化（P2）
-1. 原文阅读器样式
-2. 卡片样式调整
-3. 动画与过渡效果
+1. 原文阅读器样式 ✅（Reader tab 已完成，原文弹层保留旧交互）
+2. 卡片样式调整 ✅
+3. 动画与过渡效果 ✅
 
 ---
 

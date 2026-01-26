@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DragEvent } from 'react';
 import { X, FileText, Sparkles, UploadCloud } from 'lucide-react';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
@@ -14,14 +14,16 @@ interface ArticleInputProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialMode?: InputMode;
 }
 
 type Step = 'content' | 'processing';
 type InputMode = 'paste' | 'pdf' | 'ai';
 
-export function ArticleInput({ isOpen, onClose, onSuccess }: ArticleInputProps) {
+export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: ArticleInputProps) {
+  const initialModeValue: InputMode = initialMode ?? 'paste';
   const [step, setStep] = useState<Step>('content');
-  const [mode, setMode] = useState<InputMode>('paste');
+  const [mode, setMode] = useState<InputMode>(initialModeValue);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -34,7 +36,7 @@ export function ArticleInput({ isOpen, onClose, onSuccess }: ArticleInputProps) 
 
   const resetForm = () => {
     setStep('content');
-    setMode('paste');
+    setMode(initialModeValue);
     setTitle('');
     setContent('');
     setAiPrompt('');
@@ -45,6 +47,14 @@ export function ArticleInput({ isOpen, onClose, onSuccess }: ArticleInputProps) 
     setProcessingStatus('');
     setError('');
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialModeValue);
+      setStep('content');
+      setError('');
+    }
+  }, [isOpen, initialModeValue]);
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -153,12 +163,13 @@ export function ArticleInput({ isOpen, onClose, onSuccess }: ArticleInputProps) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex flex-col">
+      <div className="absolute inset-0 bg-black/40" onClick={() => { resetForm(); onClose(); }} />
+      <div className="relative mt-auto bg-white rounded-t-3xl w-full max-w-md mx-auto shadow-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-              <FileText className="w-5 h-5 text-teal-600" />
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">新增内容</h2>

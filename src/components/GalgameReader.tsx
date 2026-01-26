@@ -9,6 +9,7 @@ import { CloudImagePicker } from './CloudImagePicker';
 interface GalgameReaderProps {
   article: Article;
   onBack: () => void;
+  embedded?: boolean;
 }
 
 const EMOTION_EMOJIS: Record<string, string> = {
@@ -55,7 +56,7 @@ function getInitials(name: string): string {
   return name.slice(0, 2);
 }
 
-export function GalgameReader({ article, onBack }: GalgameReaderProps) {
+export function GalgameReader({ article, onBack, embedded = false }: GalgameReaderProps) {
   const [messages, setMessages] = useState<GalgameMessage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
@@ -486,8 +487,11 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   };
 
   if (isLoading) {
+    const loadingClass = embedded
+      ? 'flex-1 bg-gray-900 flex items-center justify-center'
+      : 'min-h-screen bg-gray-900 flex items-center justify-center';
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className={loadingClass}>
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="mt-4 text-gray-400">加载中...</p>
@@ -497,11 +501,16 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   }
 
   if (messages.length === 0) {
+    const emptyClass = embedded
+      ? 'flex-1 bg-gray-900 flex items-center justify-center'
+      : 'min-h-screen bg-gray-900 flex items-center justify-center';
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className={emptyClass}>
         <div className="text-center text-gray-400">
           <p>暂无内容</p>
-          <button onClick={onBack} className="mt-4 text-teal-400 hover:underline">返回</button>
+          {!embedded && (
+            <button onClick={onBack} className="mt-4 text-teal-400 hover:underline">返回</button>
+          )}
         </div>
       </div>
     );
@@ -530,7 +539,7 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
   return (
     <div
       ref={containerRef}
-      className={`h-screen bg-gray-900 flex flex-col relative overflow-hidden ${getScreenEffectClass()}`}
+      className={`${embedded ? 'flex-1 min-h-[520px]' : 'h-screen'} bg-gray-900 flex flex-col relative overflow-hidden ${getScreenEffectClass()}`}
       onClick={handleClick}
     >
       <div className="absolute inset-0 pointer-events-none">
@@ -577,38 +586,40 @@ export function GalgameReader({ article, onBack }: GalgameReaderProps) {
         <audio src={backgroundMusic} autoPlay loop className="hidden" />
       )}
 
-      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/50 to-transparent" onClick={e => e.stopPropagation()}>
-        <button
-          onClick={onBack}
-          className="p-2 hover:bg-white/10 rounded-full transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5 text-white" />
-        </button>
-        <div className="text-center">
-          <h1 className="font-medium text-white text-sm">{article.title}</h1>
-          <p className="text-xs text-gray-400">{currentIndex + 1} / {messages.length}</p>
-        </div>
-        <div className="flex gap-2">
+      {!embedded && (
+        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/50 to-transparent" onClick={e => e.stopPropagation()}>
           <button
-            onClick={() => setShowOriginalText(true)}
+            onClick={onBack}
             className="p-2 hover:bg-white/10 rounded-full transition-colors"
           >
-            <FileText className="w-5 h-5 text-white" />
+            <ArrowLeft className="w-5 h-5 text-white" />
           </button>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <Settings2 className="w-5 h-5 text-white" />
-          </button>
-          <button
-            onClick={() => setShowHistory(true)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <History className="w-5 h-5 text-white" />
-          </button>
-        </div>
-      </header>
+          <div className="text-center">
+            <h1 className="font-medium text-white text-sm">{article.title}</h1>
+            <p className="text-xs text-gray-400">{currentIndex + 1} / {messages.length}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowOriginalText(true)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <FileText className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <Settings2 className="w-5 h-5 text-white" />
+            </button>
+            <button
+              onClick={() => setShowHistory(true)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <History className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </header>
+      )}
 
       {showSettings && (
         <div
