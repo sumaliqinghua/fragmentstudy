@@ -223,6 +223,7 @@ export async function convertToDialogue(content: string, characters: string): Pr
 
 请以 JSON 数组格式返回，每个元素包含：
 - character_name: 角色名称
+- avatar_seed: 角色头像/配色种子（字符串，确保同一角色稳定一致）
 - content: 对话内容
 - is_right_side: 是否显示在右侧（学习者/提问者为 true，讲解者为 false）
 - knowledge_point: 这段对话涉及的知识点简述（可选）
@@ -237,7 +238,12 @@ export async function convertToDialogue(content: string, characters: string): Pr
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  return parseJsonArray<DialogueGenerationResult>(resultText);
+  const result = parseJsonArray<DialogueGenerationResult>(resultText);
+  const missingSeed = result.find((item) => !item.avatar_seed || item.avatar_seed.trim().length === 0);
+  if (missingSeed) {
+    throw new AIResponseParseError('AI 返回缺少 avatar_seed，请重试', resultText);
+  }
+  return result;
 }
 
 export async function* answerDialogueQuestion(
@@ -402,6 +408,7 @@ export async function convertToGalgame(content: string, characters: string): Pro
 
 请以 JSON 数组格式返回，每个元素包含：
 - character_name: 角色名称
+- avatar_seed: 角色头像/配色种子（字符串，确保同一角色稳定一致）
 - content: 对话内容（简短有力）
 - emotion_emoji: 情绪 emoji 标识（可选，从上述列表选择）
 - knowledge_point: 这段对话涉及的知识点简述（可选）
@@ -417,7 +424,12 @@ export async function convertToGalgame(content: string, characters: string): Pro
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  return parseJsonArray<GalgameGenerationResult>(resultText);
+  const result = parseJsonArray<GalgameGenerationResult>(resultText);
+  const missingSeed = result.find((item) => !item.avatar_seed || item.avatar_seed.trim().length === 0);
+  if (missingSeed) {
+    throw new AIResponseParseError('AI 返回缺少 avatar_seed，请重试', resultText);
+  }
+  return result;
 }
 
 export async function generateQuizQuestions(content: string): Promise<QuizGenerationResult[]> {

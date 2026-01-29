@@ -361,7 +361,7 @@ export async function createDialogueMessages(
   const messagesToInsert = messages.map((msg, index) => ({
     article_id: articleId,
     character_name: msg.character_name,
-    avatar_seed: msg.avatar_seed || msg.character_name,
+    avatar_seed: msg.avatar_seed,
     content: msg.content,
     sequence_order: index,
     is_right_side: msg.is_right_side,
@@ -503,7 +503,7 @@ export async function createGalgameMessages(
   const messagesToInsert = messages.map((msg, index) => ({
     article_id: articleId,
     character_name: msg.character_name,
-    avatar_seed: msg.avatar_seed || msg.character_name,
+    avatar_seed: msg.avatar_seed,
     content: msg.content,
     sequence_order: index,
     emotion_emoji: msg.emotion_emoji,

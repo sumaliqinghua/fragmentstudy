@@ -88,8 +88,6 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
   const hasLoadedCharacterPortraitsRef = useRef(false);
   const portraitStorageKey = 'galgame_emotion_portraits_global';
   const characterPortraitStorageKey = 'galgame_character_portraits_global';
-  const legacyPortraitStorageKey = `galgame_emotion_portraits_${article.id}`;
-  const legacyCharacterPortraitStorageKey = `galgame_character_portraits_${article.id}`;
   const portraitWidthStorageKey = `galgame_portrait_width_${article.id}`;
   const displayModeStorageKey = `galgame_display_mode_${article.id}`;
   const backgroundStorageKey = `galgame_background_${article.id}`;
@@ -105,10 +103,8 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
     const loadPortraits = async () => {
       try {
         const stored = localStorage.getItem(portraitStorageKey);
-        const legacy = localStorage.getItem(legacyPortraitStorageKey);
         const parsed = stored ? JSON.parse(stored) as Record<string, string> : {};
-        const legacyParsed = legacy ? JSON.parse(legacy) as Record<string, string> : {};
-        let merged = { ...parsed, ...legacyParsed };
+        let merged = { ...parsed };
         if (!stored) {
           const idbStored = await idbGet(portraitStorageKey);
           if (idbStored) {
@@ -117,9 +113,6 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
         }
         if (!cancelled) {
           setEmotionPortraits(merged);
-        }
-        if (legacy) {
-          localStorage.setItem(portraitStorageKey, JSON.stringify(merged));
         }
         await idbSet(portraitStorageKey, JSON.stringify(merged));
         hasLoadedEmotionPortraitsRef.current = true;
@@ -135,7 +128,7 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
     return () => {
       cancelled = true;
     };
-  }, [portraitStorageKey, legacyPortraitStorageKey]);
+  }, [portraitStorageKey]);
 
   useEffect(() => {
     try {
@@ -203,10 +196,8 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
     const loadPortraits = async () => {
       try {
         const stored = localStorage.getItem(characterPortraitStorageKey);
-        const legacy = localStorage.getItem(legacyCharacterPortraitStorageKey);
         const parsed = stored ? JSON.parse(stored) as Record<string, string> : {};
-        const legacyParsed = legacy ? JSON.parse(legacy) as Record<string, string> : {};
-        let merged = { ...parsed, ...legacyParsed };
+        let merged = { ...parsed };
         if (!stored) {
           const idbStored = await idbGet(characterPortraitStorageKey);
           if (idbStored) {
@@ -215,9 +206,6 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
         }
         if (!cancelled) {
           setCharacterPortraits(merged);
-        }
-        if (legacy) {
-          localStorage.setItem(characterPortraitStorageKey, JSON.stringify(merged));
         }
         await idbSet(characterPortraitStorageKey, JSON.stringify(merged));
         hasLoadedCharacterPortraitsRef.current = true;
@@ -233,7 +221,7 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
     return () => {
       cancelled = true;
     };
-  }, [characterPortraitStorageKey, legacyCharacterPortraitStorageKey]);
+  }, [characterPortraitStorageKey]);
 
   useEffect(() => {
     try {
