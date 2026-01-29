@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, FileText, HelpCircle, Layers, MessageCircle, Tv, Users, X } from 'lucide-react';
+import { ChevronLeft, FileText, HelpCircle, Layers, MessageCircle, Tv, X } from 'lucide-react';
 import {
   createCards,
   createDialogueMessages,
@@ -14,10 +14,9 @@ import {
   getArticlesCacheSnapshot,
 } from '../services/dataService';
 import { AIResponseParseError, convertToDialogue, convertToGalgame, generateQuizQuestions, isConfigured, splitArticle } from '../services/openai';
-import { OriginalTextView } from '../components/OriginalTextView';
 import type { Article, LearningProgress } from '../types';
 
-type Mode = 'card' | 'dialogue' | 'galgame' | 'quiz';
+type Mode = 'original' | 'card' | 'dialogue' | 'galgame' | 'quiz';
 
 type CharacterModalState = {
   isOpen: boolean;
@@ -40,7 +39,6 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
   const [quizCount, setQuizCount] = useState(cachedArticle?.quizCount || 0);
   const [progress, setProgress] = useState<LearningProgress | null>(null);
   const [isLoading, setIsLoading] = useState(!cachedArticle);
-  const [showOriginal, setShowOriginal] = useState(false);
   const [error, setError] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMode, setGeneratingMode] = useState<Mode | null>(null);
@@ -261,7 +259,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
             <p className="text-xs text-slate-500">导入时间：{new Date(article.created_at).toLocaleDateString()}</p>
           </div>
           <button
-            onClick={() => setShowOriginal(true)}
+            onClick={() => onOpenMode('original')}
             className="px-3 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
           >
             查看原文
@@ -308,7 +306,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
               </button>
             )}
             <button
-              onClick={() => setShowOriginal(true)}
+              onClick={() => onOpenMode('original')}
               className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-2xl font-semibold"
             >
               阅读原文
@@ -321,9 +319,9 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
             <h2 className="text-base font-semibold text-slate-800">模式入口</h2>
             <span className="text-xs text-slate-400">点击进入或生成</span>
           </div>
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4 touch-pan-x">
             <button
-              onClick={() => setShowOriginal(true)}
+              onClick={() => onOpenMode('original')}
               className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
             >
               <FileText className="w-6 h-6 text-amber-500" />
@@ -386,13 +384,6 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
           </div>
         </section>
       </main>
-
-      <OriginalTextView
-        isOpen={showOriginal}
-        articleId={article.id}
-        originalContent={article.original_content}
-        onClose={() => setShowOriginal(false)}
-      />
 
       {characterModal.isOpen && characterModal.mode && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

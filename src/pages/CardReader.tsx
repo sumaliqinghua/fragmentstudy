@@ -15,7 +15,6 @@ import { CardStack } from '../components/CardStack';
 import { ProgressBar } from '../components/ProgressBar';
 import { TreasureBox } from '../components/TreasureBox';
 import { ContextPreview } from '../components/ContextPreview';
-import { OriginalTextView } from '../components/OriginalTextView';
 import { AIChat } from '../components/AIChat';
 import { ActionMenu } from '../components/ActionMenu';
 import type { Article, Card, Highlight } from '../types';
@@ -23,11 +22,12 @@ import type { Article, Card, Highlight } from '../types';
 interface CardReaderProps {
   articleId: string;
   onBack: () => void;
+  onOpenOriginal: () => void;
 }
 
 const MILESTONES = [30, 60, 80] as const;
 
-export function CardReader({ articleId, onBack }: CardReaderProps) {
+export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,7 +37,6 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   const [showContextPreview, setShowContextPreview] = useState(false);
-  const [showOriginalText, setShowOriginalText] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [pendingMilestone, setPendingMilestone] = useState<30 | 60 | 80 | null>(null);
@@ -149,7 +148,7 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (showContextPreview || showOriginalText || showAIChat || pendingMilestone) return;
+      if (showContextPreview || showAIChat || pendingMilestone) return;
 
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         handleNext();
@@ -160,7 +159,7 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNext, handlePrev, showContextPreview, showOriginalText, showAIChat, pendingMilestone]);
+  }, [handleNext, handlePrev, showContextPreview, showAIChat, pendingMilestone]);
 
   if (isLoading) {
     return (
@@ -266,19 +265,6 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
         onClose={() => setShowContextPreview(false)}
       />
 
-      <OriginalTextView
-        isOpen={showOriginalText}
-        articleId={articleId}
-        originalContent={article.original_content}
-        currentCard={currentCard}
-        allCards={cards}
-        onClose={() => setShowOriginalText(false)}
-        onJumpToCard={(index) => {
-          setCurrentIndex(index);
-          setShowOriginalText(false);
-        }}
-      />
-
       <AIChat
         isOpen={showAIChat}
         currentCard={currentCard}
@@ -293,7 +279,7 @@ export function CardReader({ articleId, onBack }: CardReaderProps) {
         onClose={() => setShowActions(false)}
         onViewOriginal={() => {
           setShowActions(false);
-          setShowOriginalText(true);
+          onOpenOriginal();
         }}
         onToggleBookmark={() => {
           setShowActions(false);

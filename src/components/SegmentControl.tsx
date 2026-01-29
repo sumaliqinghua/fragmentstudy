@@ -16,15 +16,14 @@ export function SegmentControl({ tabs, activeKey, onChange }: SegmentControlProp
     0,
     tabs.findIndex((tab) => tab.key === activeKey)
   );
-  const widthPercent = 100 / tabs.length;
-
   return (
     <div className="relative bg-slate-100 rounded-full p-1 flex items-center">
       <div
         className="absolute top-1 bottom-1 rounded-full bg-white shadow-sm transition-transform"
         style={{
-          width: `${widthPercent}%`,
-          transform: `translateX(${activeIndex * widthPercent}%)`,
+          left: '4px',
+          width: `calc((100% - 8px) / ${tabs.length})`,
+          transform: `translateX(${activeIndex * 100}%)`,
         }}
       />
       {tabs.map((tab) => (

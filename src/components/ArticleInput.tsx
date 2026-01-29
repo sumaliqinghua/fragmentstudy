@@ -163,9 +163,9 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col">
+    <div className="fixed inset-0 z-[60] flex flex-col">
       <div className="absolute inset-0 bg-black/40" onClick={() => { resetForm(); onClose(); }} />
-      <div className="relative mt-auto bg-white rounded-t-3xl w-full max-w-md mx-auto shadow-2xl max-h-[92vh] flex flex-col">
+      <div className="relative mt-auto mb-24 bg-white rounded-t-3xl w-full max-w-md mx-auto shadow-2xl max-h-[calc(100vh-120px)] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">

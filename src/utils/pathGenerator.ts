@@ -37,7 +37,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function generateLearningPath(options: GeneratePathOptions): PathNode[] {
-  const { cards, quizzes, progress, claimedMilestones, cardsPerNode = 2 } = options;
+  const { cards, quizzes, progress, claimedMilestones, cardsPerNode = 5 } = options;
   const cardGroups = chunkArray(cards, cardsPerNode);
   const cardNodes: PathNode[] = cardGroups.map((group, index) => {
     const start = index * cardsPerNode;

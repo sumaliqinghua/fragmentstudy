@@ -113,7 +113,13 @@ function AppContent() {
   }
 
   if (view.tab === 'reader' && view.mode === 'card') {
-    return <CardReader articleId={view.articleId!} onBack={handleBackToArticle} />;
+    return (
+      <CardReader
+        articleId={view.articleId!}
+        onBack={handleBackToArticle}
+        onOpenOriginal={() => setView({ tab: 'reader', articleId: view.articleId, mode: 'original' })}
+      />
+    );
   }
   if (view.tab === 'reader' && view.mode === 'quiz') {
     return <QuizReader articleId={view.articleId!} onBack={handleBackToArticle} />;
@@ -143,6 +149,7 @@ function AppContent() {
             setView({ tab: 'home', articleId: id });
           }}
           onCreate={() => setView({ tab: 'create' })}
+          onCurrentArticleChange={(id) => setLastArticleId(id)}
         />
       )}
       {view.tab === 'create' && (
@@ -160,7 +167,6 @@ function AppContent() {
           articleId={view.articleId}
           initialMode={view.mode as ReaderMode}
           onBack={() => setView({ tab: 'home' })}
-          onOpenHub={() => setView({ tab: 'home', articleId: view.articleId })}
           onStartQuiz={() => setView({ tab: 'reader', articleId: view.articleId, mode: 'quiz' })}
         />
       )}

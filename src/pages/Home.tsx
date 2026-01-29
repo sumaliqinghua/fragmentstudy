@@ -18,14 +18,31 @@ interface HomeProps {
   onSelectArticle: (id: string) => void;
   onCreate: () => void;
   onOpenNode?: (node: PathNode, articleId: string) => void;
+  onCurrentArticleChange?: (id: string) => void;
 }
 
-export function Home({ onSelectArticle, onCreate, onOpenNode }: HomeProps) {
+function getArticleActivityTime(article: ArticleWithProgress): number {
+  const createdAt = new Date(article.created_at).getTime();
+  const lastReadAt = article.progress?.last_read_at
+    ? new Date(article.progress.last_read_at).getTime()
+    : 0;
+  return Math.max(createdAt, lastReadAt);
+}
+
+function getDefaultArticleId(articles: ArticleWithProgress[]): string | null {
+  if (articles.length === 0) return null;
+  const latest = articles.reduce((acc, article) => {
+    return getArticleActivityTime(article) > getArticleActivityTime(acc) ? article : acc;
+  }, articles[0]);
+  return latest.id;
+}
+
+export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleChange }: HomeProps) {
   const { user } = useAuth();
   const cachedArticles = getArticlesCacheSnapshot();
   const [articles, setArticles] = useState<ArticleWithProgress[]>(cachedArticles || []);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(
-    cachedArticles?.[0]?.id || null
+    cachedArticles ? getDefaultArticleId(cachedArticles) : null
   );
   const [totalPoints, setTotalPoints] = useState(0);
   const [isLoading, setIsLoading] = useState(!cachedArticles);
@@ -49,7 +66,12 @@ export function Home({ onSelectArticle, onCreate, onOpenNode }: HomeProps) {
         const [articlesData, points] = await Promise.all([getArticles(), getTotalPoints()]);
         setArticles(articlesData);
         setTotalPoints(points);
-        setSelectedArticleId((current) => current ?? articlesData[0]?.id ?? null);
+        setSelectedArticleId((current) => {
+          if (current && articlesData.some((article) => article.id === current)) {
+            return current;
+          }
+          return getDefaultArticleId(articlesData);
+        });
       } catch (error) {
         console.error('Failed to load home data:', error);
       } finally {
@@ -62,6 +84,7 @@ export function Home({ onSelectArticle, onCreate, onOpenNode }: HomeProps) {
 
   useEffect(() => {
     if (!selectedArticleId) return;
+    onCurrentArticleChange?.(selectedArticleId);
 
     const loadPathData = async () => {
       setIsPathLoading(true);
@@ -186,7 +209,7 @@ export function Home({ onSelectArticle, onCreate, onOpenNode }: HomeProps) {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-800 font-display">学习路径</h2>
-                <p className="text-sm text-slate-400">每完成 2 张卡片解锁一次测验</p>
+                <p className="text-sm text-slate-400">每完成 5 张卡片解锁一次测验</p>
               </div>
               <button
                 onClick={() => selectedArticleId && onSelectArticle(selectedArticleId)}
