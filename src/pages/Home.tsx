@@ -13,6 +13,7 @@ import { LearningPath } from '../components/LearningPath';
 import { generateLearningPath, type PathNode } from '../utils/pathGenerator';
 import type { ArticleWithProgress, Card, LearningProgress, QuizQuestion } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { getStreakDays } from '../utils/streak';
 
 interface HomeProps {
   onSelectArticle: (id: string) => void;
@@ -53,6 +54,7 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
   const [claimedMilestones, setClaimedMilestones] = useState<number[]>([]);
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
   const [isPathLoading, setIsPathLoading] = useState(false);
+  const [streakDays, setStreakDays] = useState(() => getStreakDays());
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) || null,
@@ -81,6 +83,16 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
 
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    const syncStreak = () => setStreakDays(getStreakDays());
+    window.addEventListener('streak:update', syncStreak);
+    window.addEventListener('focus', syncStreak);
+    return () => {
+      window.removeEventListener('streak:update', syncStreak);
+      window.removeEventListener('focus', syncStreak);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedArticleId) return;
@@ -183,7 +195,7 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
               <Flame className="w-4 h-4 text-orange-500" />
-              <span className="text-sm font-semibold text-slate-700">3 天</span>
+              <span className="text-sm font-semibold text-slate-700">{streakDays} 天</span>
             </div>
             <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
               <Gem className="w-4 h-4 text-secondary" />

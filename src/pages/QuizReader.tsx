@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Heart } from 'lucide-react';
 import { getArticle, getQuizQuestions } from '../services/dataService';
+import { StreakModal } from '../components/StreakModal';
+import { getStreakDays, recordStreak } from '../utils/streak';
 import type { Article, QuizQuestion } from '../types';
 
 interface QuizReaderProps {
@@ -16,6 +18,8 @@ export function QuizReader({ articleId, onBack }: QuizReaderProps) {
   const [checked, setChecked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [lives, setLives] = useState(5);
+  const [showStreak, setShowStreak] = useState(false);
+  const [streakDays, setStreakDays] = useState(() => getStreakDays());
 
   useEffect(() => {
     const loadData = async () => {
@@ -59,7 +63,13 @@ export function QuizReader({ articleId, onBack }: QuizReaderProps) {
   const handleNext = () => {
     if (!isAnswered) return;
     if (isLastQuestion) {
-      onBack();
+      const result = recordStreak({ forceShow: true });
+      setStreakDays(result.streakDays);
+      if (result.shouldShow) {
+        setShowStreak(true);
+      } else {
+        onBack();
+      }
       return;
     }
     setCurrentIndex((prev) => prev + 1);
@@ -209,6 +219,15 @@ export function QuizReader({ articleId, onBack }: QuizReaderProps) {
           </button>
         </div>
       </footer>
+
+      <StreakModal
+        isOpen={showStreak}
+        streakDays={streakDays}
+        onClose={() => {
+          setShowStreak(false);
+          onBack();
+        }}
+      />
     </div>
   );
 }

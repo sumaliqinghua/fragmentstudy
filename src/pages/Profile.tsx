@@ -4,6 +4,7 @@ import { getArticles, getTotalPoints } from '../services/dataService';
 import { SettingsModal } from '../components/SettingsModal';
 import { AuthModal } from '../components/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { getStreakDays } from '../utils/streak';
 import type { ArticleWithProgress } from '../types';
 
 export function Profile() {
@@ -40,7 +41,9 @@ export function Profile() {
       0
     );
     const progressPercent = totalCards > 0 ? Math.round((totalCompleted / totalCards) * 100) : 0;
-    const streakDays = totalCompleted > 0 ? Math.min(7, Math.max(1, Math.floor(totalCompleted / 3))) : 0;
+    const computedStreak = totalCompleted > 0 ? Math.min(7, Math.max(1, Math.floor(totalCompleted / 3))) : 0;
+    const storedStreak = getStreakDays();
+    const streakDays = Math.max(storedStreak, computedStreak);
     return { articleCount, totalCards, totalCompleted, progressPercent, streakDays };
   }, [articles]);
 

@@ -14,9 +14,11 @@ import {
 import { CardStack } from '../components/CardStack';
 import { ProgressBar } from '../components/ProgressBar';
 import { TreasureBox } from '../components/TreasureBox';
+import { StreakModal } from '../components/StreakModal';
 import { ContextPreview } from '../components/ContextPreview';
 import { AIChat } from '../components/AIChat';
 import { ActionMenu } from '../components/ActionMenu';
+import { getStreakDays, recordStreak } from '../utils/streak';
 import type { Article, Card, Highlight } from '../types';
 
 interface CardReaderProps {
@@ -40,6 +42,9 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
   const [showAIChat, setShowAIChat] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [pendingMilestone, setPendingMilestone] = useState<30 | 60 | 80 | null>(null);
+  const [showStreak, setShowStreak] = useState(false);
+  const [streakDays, setStreakDays] = useState(() => getStreakDays());
+  const [streakQueued, setStreakQueued] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -73,17 +78,17 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
     return;
   };
 
-  const checkMilestone = useCallback((index: number) => {
+  const getMilestone = useCallback((index: number) => {
     if (cards.length === 0) return;
 
     const percent = Math.round(((index + 1) / cards.length) * 100);
 
     for (const milestone of MILESTONES) {
       if (percent >= milestone && !claimedMilestones.includes(milestone)) {
-        setPendingMilestone(milestone);
-        break;
+        return milestone;
       }
     }
+    return null;
   }, [cards.length, claimedMilestones]);
 
   const saveProgress = useCallback(async (index: number) => {
@@ -99,9 +104,19 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
       saveProgress(newIndex);
-      checkMilestone(newIndex);
+      const milestone = getMilestone(newIndex);
+      if (milestone) {
+        setPendingMilestone(milestone);
+        setStreakQueued(true);
+      } else {
+        const result = recordStreak();
+        setStreakDays(result.streakDays);
+        if (result.shouldShow) {
+          setShowStreak(true);
+        }
+      }
     }
-  }, [currentIndex, cards.length, saveProgress, checkMilestone]);
+  }, [currentIndex, cards.length, saveProgress, getMilestone]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -117,6 +132,14 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
     const reward = await claimReward(articleId, pendingMilestone);
     if (reward) {
       setClaimedMilestones(prev => [...prev, pendingMilestone]);
+    }
+    if (streakQueued) {
+      const result = recordStreak({ forceShow: true });
+      setStreakDays(result.streakDays);
+      if (result.shouldShow) {
+        setShowStreak(true);
+      }
+      setStreakQueued(false);
     }
     return reward?.points || null;
   };
@@ -296,6 +319,12 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
         milestone={pendingMilestone || 30}
         onClaim={handleClaimReward}
         onClose={() => setPendingMilestone(null)}
+      />
+
+      <StreakModal
+        isOpen={showStreak}
+        streakDays={streakDays}
+        onClose={() => setShowStreak(false)}
       />
     </div>
   );
