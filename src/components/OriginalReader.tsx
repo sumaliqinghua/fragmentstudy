@@ -200,7 +200,7 @@ export function OriginalReader({ article, onStartQuiz, onScrollProgress }: Origi
   };
 
   return (
-    <div className="px-6 pb-24 max-w-md mx-auto">
+    <div className="px-6 pb-24 max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
       <div className="mb-8">
         <div className="w-full h-52 rounded-2xl overflow-hidden mb-6 shadow-sm border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-200 flex items-center justify-center">
           <BookOpen className="w-16 h-16 text-slate-300" />

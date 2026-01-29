@@ -41,9 +41,7 @@ export function Profile() {
       0
     );
     const progressPercent = totalCards > 0 ? Math.round((totalCompleted / totalCards) * 100) : 0;
-    const computedStreak = totalCompleted > 0 ? Math.min(7, Math.max(1, Math.floor(totalCompleted / 3))) : 0;
-    const storedStreak = getStreakDays();
-    const streakDays = Math.max(storedStreak, computedStreak);
+    const streakDays = getStreakDays();
     return { articleCount, totalCards, totalCompleted, progressPercent, streakDays };
   }, [articles]);
 
@@ -101,7 +99,7 @@ export function Profile() {
             <p className="text-xl font-bold text-slate-800 mt-2">{totalPoints}</p>
           </div>
           <div className="bg-white border border-slate-100 rounded-2xl p-4">
-            <p className="text-xs text-slate-400">连胜天数</p>
+            <p className="text-xs text-slate-400">最高连胜</p>
             <p className="text-xl font-bold text-slate-800 mt-2">{stats.streakDays} 天</p>
           </div>
           <div className="bg-white border border-slate-100 rounded-2xl p-4">

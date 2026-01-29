@@ -1,5 +1,6 @@
 export type StreakRecordResult = {
   streakDays: number;
+  maxStreakDays: number;
   shouldShow: boolean;
 };
 
@@ -7,6 +8,7 @@ type StreakStore = {
   days: number;
   lastDate: string;
   lastShownDate?: string;
+  maxDays?: number;
 };
 
 const STREAK_KEY = 'fragmentArticle.streak';
@@ -26,10 +28,13 @@ function readStore(): StreakStore {
     const raw = window.localStorage.getItem(STREAK_KEY);
     if (!raw) return { days: 0, lastDate: '' };
     const parsed = JSON.parse(raw) as StreakStore;
+    const baseDays = typeof parsed.days === 'number' ? parsed.days : 0;
+    const maxDays = typeof parsed.maxDays === 'number' ? parsed.maxDays : baseDays;
     return {
-      days: typeof parsed.days === 'number' ? parsed.days : 0,
+      days: baseDays,
       lastDate: typeof parsed.lastDate === 'string' ? parsed.lastDate : '',
       lastShownDate: typeof parsed.lastShownDate === 'string' ? parsed.lastShownDate : undefined,
+      maxDays,
     };
   } catch {
     return { days: 0, lastDate: '' };
@@ -39,12 +44,12 @@ function readStore(): StreakStore {
 function writeStore(store: StreakStore): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(STREAK_KEY, JSON.stringify(store));
-  window.dispatchEvent(new CustomEvent('streak:update', { detail: store.days }));
+  window.dispatchEvent(new CustomEvent('streak:update', { detail: store.maxDays ?? store.days }));
 }
 
 export function getStreakDays(): number {
   const store = readStore();
-  return store.days || 0;
+  return store.maxDays ?? store.days ?? 0;
 }
 
 export function recordStreak(options?: { date?: Date; forceShow?: boolean }): StreakRecordResult {
@@ -57,6 +62,7 @@ export function recordStreak(options?: { date?: Date; forceShow?: boolean }): St
 
   const store = readStore();
   let days = store.days || 0;
+  let maxDays = store.maxDays ?? days;
 
   if (store.lastDate === todayKey) {
     // No change.
@@ -67,14 +73,16 @@ export function recordStreak(options?: { date?: Date; forceShow?: boolean }): St
   }
 
   const shouldShow = forceShow || store.lastShownDate !== todayKey;
+  maxDays = Math.max(maxDays, days);
 
   const nextStore: StreakStore = {
     days,
     lastDate: todayKey,
     lastShownDate: shouldShow ? todayKey : store.lastShownDate,
+    maxDays,
   };
 
   writeStore(nextStore);
 
-  return { streakDays: days, shouldShow };
+  return { streakDays: days, maxStreakDays: maxDays, shouldShow };
 }

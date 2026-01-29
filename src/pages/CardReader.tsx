@@ -109,11 +109,11 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
         setPendingMilestone(milestone);
         setStreakQueued(true);
       } else {
-        const result = recordStreak();
-        setStreakDays(result.streakDays);
-        if (result.shouldShow) {
-          setShowStreak(true);
-        }
+      const result = recordStreak();
+      setStreakDays(result.streakDays);
+      if (result.shouldShow) {
+        setShowStreak(true);
+      }
       }
     }
   }, [currentIndex, cards.length, saveProgress, getMilestone]);

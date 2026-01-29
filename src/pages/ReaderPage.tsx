@@ -161,7 +161,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
   return (
     <div className="min-h-screen bg-white pb-24">
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100">
-        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <button
             onClick={onBack}
             className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
@@ -180,7 +180,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
             <Settings2 className="w-5 h-5 text-slate-600" />
           </button>
         </div>
-        <div className="max-w-md mx-auto px-4 pb-3">
+        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 pb-3">
           <SegmentControl
             tabs={[
               { key: 'original', label: '原文' },
@@ -202,7 +202,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
       )}
 
       {mode === 'dialogue' && (
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
           {dialogueCount === 0 ? (
             <div className="px-6 py-16 text-center">
               <p className="text-lg font-semibold text-slate-700">群聊内容未生成</p>
@@ -230,7 +230,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
       )}
 
       {mode === 'galgame' && (
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
           {galgameCount === 0 ? (
             <div className="px-6 py-16 text-center">
               <p className="text-lg font-semibold text-slate-700">Galgame 内容未生成</p>

@@ -159,7 +159,7 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
-      <div className="max-w-md mx-auto px-4 pt-6">
+      <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 pt-6">
         <header className="flex items-center justify-between gap-4">
           <div className="relative">
             <button
