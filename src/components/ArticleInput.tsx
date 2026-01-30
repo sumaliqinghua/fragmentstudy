@@ -3,7 +3,7 @@ import type { DragEvent } from 'react';
 import { X, FileText, Sparkles, UploadCloud } from 'lucide-react';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
 import { createArticle } from '../services/dataService';
-import { generateLearningArticle, isConfigured } from '../services/openai';
+import { AIResponseParseError, generateLearningArticle, isConfigured } from '../services/openai';
 
 GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/legacy/build/pdf.worker.min.js',
@@ -141,11 +141,11 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
     setIsGenerating(true);
     try {
       const result = await generateLearningArticle(aiPrompt.trim());
-      if (!title.trim() && result.title) {
-        setTitle(result.title);
-      }
-      setContent(result.content);
+      setContent(result);
     } catch (err) {
+      if (err instanceof AIResponseParseError && err.rawText) {
+        setContent(err.rawText);
+      }
       setError(err instanceof Error ? err.message : '生成失败，请重试');
     } finally {
       setIsGenerating(false);

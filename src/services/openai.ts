@@ -43,14 +43,32 @@ export function isConfigured(): boolean {
   return !!config.apiKey && !!config.apiEndpoint;
 }
 
-async function callOpenAI(messages: { role: string; content: string }[], stream = false): Promise<Response> {
+type OpenAIResponseFormat = {
+  type: 'json_schema';
+  json_schema: {
+    name: string;
+    schema: {
+      type: string;
+      properties?: Record<string, unknown>;
+      items?: Record<string, unknown>;
+      required?: string[];
+      additionalProperties?: boolean;
+    };
+  };
+};
+
+async function callOpenAI(
+  messages: { role: string; content: string }[],
+  stream = false,
+  responseFormat?: OpenAIResponseFormat
+): Promise<Response> {
   const config = getOpenAIConfig();
 
   if (!config.apiKey) {
     throw new Error('请先配置 API Key');
   }
 
-  const responseFormat = stream
+  const defaultArrayFormat: OpenAIResponseFormat | undefined = stream
     ? undefined
     : {
         type: 'json_schema',
@@ -65,6 +83,7 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
           },
         },
       };
+  const finalResponseFormat = responseFormat ?? defaultArrayFormat;
 
   const response = await fetch(getProxyUrl(), {
     method: 'POST',
@@ -78,7 +97,7 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
       model: config.model,
       messages,
       stream,
-      ...(responseFormat ? { response_format: responseFormat } : {}),
+      ...(finalResponseFormat ? { response_format: finalResponseFormat } : {}),
       temperature: 0.7,
     }),
   });
@@ -91,8 +110,17 @@ async function callOpenAI(messages: { role: string; content: string }[], stream 
   return response;
 }
 
+function extractJsonPayload(resultText: string): string {
+  const withoutThink = resultText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const fencedMatch = withoutThink.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fencedMatch) {
+    return fencedMatch[1].trim();
+  }
+  return withoutThink;
+}
+
 function parseJsonArray<T>(resultText: string): T[] {
-  const cleanedText = resultText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const cleanedText = extractJsonPayload(resultText);
   const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
     throw new AIResponseParseError('AI 返回格式错误，请重试', cleanedText || resultText);
@@ -104,6 +132,7 @@ function parseJsonArray<T>(resultText: string): T[] {
     throw new AIResponseParseError('AI 返回的 JSON 无法解析，请复制后手动修正', cleanedText || resultText);
   }
 }
+
 
 export async function splitArticle(content: string): Promise<CardSplitResult[]> {
   const systemPrompt = `你是一个专业的教育内容拆分专家。你的任务是将长文章按语义结构拆分成适合碎片化学习的卡片。
@@ -462,54 +491,23 @@ export async function generateQuizQuestions(content: string): Promise<QuizGenera
   return parseJsonArray<QuizGenerationResult>(resultText);
 }
 
-export async function generateLearningArticle(prompt: string): Promise<{ title: string; content: string }> {
+export async function generateLearningArticle(prompt: string): Promise<string> {
   const systemPrompt = `你是一个学习文章写作助手。请根据用户的问题或内容，生成一篇结构清晰、可读性强的学习文章。
 
 要求：
 1. 内容准确、通俗易懂，适合学习复盘
 2. 可以使用小标题和列表来组织结构
-3. 输出 JSON 格式：{"title": "...", "content": "..."}，只返回 JSON，不要其他内容`;
+3. 只返回文章正文文本，不要包含 JSON、代码块或额外说明`;
 
-  const config = getOpenAIConfig();
-
-  if (!config.apiKey) {
-    throw new Error('请先配置 API Key');
-  }
-
-  const response = await fetch(getProxyUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      apiKey: config.apiKey,
-      apiEndpoint: config.apiEndpoint,
-      model: config.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `用户输入：${prompt}` },
-      ],
-      stream: false,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || `API 请求失败: ${response.status}`);
-  }
+  const response = await callOpenAI([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `用户输入：${prompt}` },
+  ]);
 
   const data = await response.json();
-  const resultText = data.choices[0]?.message?.content || '{}';
-
-  try {
-    const parsed = JSON.parse(resultText);
-    return {
-      title: String(parsed.title || '').trim(),
-      content: String(parsed.content || '').trim(),
-    };
-  } catch (error) {
-    throw new AIResponseParseError('AI 返回格式错误，请重试', resultText);
+  const resultText = String(data.choices[0]?.message?.content || '').trim();
+  if (!resultText) {
+    throw new AIResponseParseError('AI 返回内容为空，请重试', '');
   }
+  return resultText;
 }

@@ -33,6 +33,7 @@ function AppContent() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [readerEntryTab, setReaderEntryTab] = useState<TabKey>('reader');
   const [mountedViews, setMountedViews] = useState({
     home: true,
     create: false,
@@ -66,7 +67,7 @@ function AppContent() {
     if (view.tab === 'home' && view.articleId) {
       setLastArticleHubId(view.articleId);
     }
-    if (view.tab === 'reader' && view.articleId) {
+    if (view.tab === 'reader' && view.articleId && view.mode !== 'card' && view.mode !== 'quiz') {
       setLastReader({ articleId: view.articleId, mode: view.mode });
     }
     setMountedViews((prev) => ({
@@ -126,6 +127,7 @@ function AppContent() {
       setView({ tab: 'profile' });
       return;
     }
+    setReaderEntryTab('reader');
     if (lastReader.articleId) {
       setView({ tab: 'reader', articleId: lastReader.articleId, mode: lastReader.mode || 'original' });
       return;
@@ -149,6 +151,7 @@ function AppContent() {
   }
 
   const activeTab: TabKey = view.tab === 'reader' ? 'reader' : view.tab;
+  const resolvedActiveTab: TabKey = view.tab === 'reader' ? readerEntryTab : activeTab;
   const showHome = view.tab === 'home' && !view.articleId;
   const showArticleHub = view.tab === 'home' && !!view.articleId;
   const showCardReader = view.tab === 'reader' && view.mode === 'card' && !!view.articleId;
@@ -158,6 +161,7 @@ function AppContent() {
   const articleHubId = view.tab === 'home' ? view.articleId : lastArticleHubId;
   const readerArticleId = view.tab === 'reader' ? view.articleId : lastReader.articleId;
   const readerMode = view.tab === 'reader' ? view.mode : lastReader.mode;
+  const homeActiveArticleId = view.tab === 'home' ? (view.articleId ?? lastArticleId) : lastArticleId;
 
   return (
     <>
@@ -171,6 +175,7 @@ function AppContent() {
             onCreate={() => setView({ tab: 'create' })}
             onCurrentArticleChange={(id) => setLastArticleId(id)}
             isActive={showHome}
+            activeArticleId={homeActiveArticleId}
           />
         </div>
       )}
@@ -181,6 +186,7 @@ function AppContent() {
             onBack={handleBackToHome}
             onOpenMode={(mode) => {
               setLastArticleId(articleHubId);
+              setReaderEntryTab('home');
               setView({ tab: 'reader', articleId: articleHubId, mode });
             }}
           />
@@ -231,7 +237,7 @@ function AppContent() {
           <ReaderPlaceholder onBack={() => setView({ tab: 'home' })} />
         </div>
       )}
-      <BottomTabBar activeTab={activeTab} onChange={handleTabChange} />
+      <BottomTabBar activeTab={resolvedActiveTab} onChange={handleTabChange} />
       <WelcomeModal
         isOpen={showWelcome}
         onLogin={handleWelcomeLogin}

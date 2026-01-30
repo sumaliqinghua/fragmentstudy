@@ -7,9 +7,14 @@ import {
   createQuizQuestions,
   getArticle,
   getCards,
+  getCardsCacheSnapshot,
+  getDialogueCacheSnapshot,
+  getGalgameCacheSnapshot,
   getDialogueMessages,
   getGalgameMessages,
   getProgress,
+  getProgressCacheSnapshot,
+  getQuizCacheSnapshot,
   getQuizQuestions,
   getArticlesCacheSnapshot,
 } from '../services/dataService';
@@ -88,6 +93,26 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
   };
 
   useEffect(() => {
+    const cachedCards = getCardsCacheSnapshot(articleId);
+    if (cachedCards !== undefined) {
+      setCardCount(cachedCards.length);
+    }
+    const cachedDialogues = getDialogueCacheSnapshot(articleId);
+    if (cachedDialogues !== undefined) {
+      setDialogueCount(cachedDialogues.length);
+    }
+    const cachedGalgames = getGalgameCacheSnapshot(articleId);
+    if (cachedGalgames !== undefined) {
+      setGalgameCount(cachedGalgames.length);
+    }
+    const cachedQuizzes = getQuizCacheSnapshot(articleId);
+    if (cachedQuizzes !== undefined) {
+      setQuizCount(cachedQuizzes.length);
+    }
+    const cachedProgress = getProgressCacheSnapshot(articleId);
+    if (cachedProgress !== undefined) {
+      setProgress(cachedProgress);
+    }
     loadArticle();
   }, [articleId]);
 
@@ -107,6 +132,20 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
       }
     };
   }, [error]);
+
+  useEffect(() => {
+    const handleProgressUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ articleId?: string; progress?: LearningProgress | null }>).detail;
+      if (!detail?.articleId || detail.articleId !== articleId) return;
+      if (detail.progress !== undefined) {
+        setProgress(detail.progress ?? null);
+      } else {
+        setProgress(getProgressCacheSnapshot(articleId) ?? null);
+      }
+    };
+    window.addEventListener('progress:update', handleProgressUpdate);
+    return () => window.removeEventListener('progress:update', handleProgressUpdate);
+  }, [articleId]);
 
   const ensureConfigured = () => {
     if (!isConfigured()) {

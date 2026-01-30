@@ -3,9 +3,13 @@ import { ChevronDown, Flame, Gem, Plus } from 'lucide-react';
 import {
   getArticles,
   getCards,
+  getCardsCacheSnapshot,
   getProgress,
+  getProgressCacheSnapshot,
+  getQuizCacheSnapshot,
   getQuizQuestions,
   getRewards,
+  getRewardsCacheSnapshot,
   getTotalPoints,
   getArticlesCacheSnapshot,
 } from '../services/dataService';
@@ -21,6 +25,7 @@ interface HomeProps {
   onOpenNode?: (node: PathNode, articleId: string) => void;
   onCurrentArticleChange?: (id: string) => void;
   isActive?: boolean;
+  activeArticleId?: string | null;
 }
 
 function getArticleActivityTime(article: ArticleWithProgress): number {
@@ -39,7 +44,14 @@ function getDefaultArticleId(articles: ArticleWithProgress[]): string | null {
   return latest.id;
 }
 
-export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleChange, isActive = true }: HomeProps) {
+export function Home({
+  onSelectArticle,
+  onCreate,
+  onOpenNode,
+  onCurrentArticleChange,
+  isActive = true,
+  activeArticleId,
+}: HomeProps) {
   const { user } = useAuth();
   const cachedArticles = getArticlesCacheSnapshot();
   const [articles, setArticles] = useState<ArticleWithProgress[]>(cachedArticles || []);
@@ -69,8 +81,11 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
       setArticles(articlesData);
       setTotalPoints(points);
       setSelectedArticleId((current) => {
-        if (current && articlesData.some((article) => article.id === current)) {
-          return current;
+        const preferred = activeArticleId && articlesData.some((article) => article.id === activeArticleId)
+          ? activeArticleId
+          : current;
+        if (preferred && articlesData.some((article) => article.id === preferred)) {
+          return preferred;
         }
         return getDefaultArticleId(articlesData);
       });
@@ -86,6 +101,12 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
   }, [user]);
 
   useEffect(() => {
+    if (activeArticleId && activeArticleId !== selectedArticleId) {
+      setSelectedArticleId(activeArticleId);
+    }
+  }, [activeArticleId, selectedArticleId]);
+
+  useEffect(() => {
     const syncStreak = () => setStreakDays(getStreakDays());
     window.addEventListener('streak:update', syncStreak);
     window.addEventListener('focus', syncStreak);
@@ -99,54 +120,30 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
     if (!selectedArticleId) return;
     onCurrentArticleChange?.(selectedArticleId);
 
-    const loadPathData = async () => {
-      setIsPathLoading(true);
-      try {
-        const [cardsData, quizData, progressData, rewardData] = await Promise.all([
-          getCards(selectedArticleId),
-          getQuizQuestions(selectedArticleId),
-          getProgress(selectedArticleId),
-          getRewards(selectedArticleId),
-        ]);
-        setCards(cardsData);
-        setQuizzes(quizData);
-        setProgress(progressData);
-        setClaimedMilestones(rewardData.map((reward) => reward.milestone));
-      } catch (error) {
-        console.error('Failed to load path data:', error);
-      } finally {
-        setIsPathLoading(false);
-      }
-    };
-
-    loadPathData();
+    applyCachedPathData(selectedArticleId);
+    refreshPathData(selectedArticleId, true);
   }, [selectedArticleId]);
 
   useEffect(() => {
     if (!isActive) return;
     loadHomeData();
     if (selectedArticleId) {
-      setIsPathLoading(true);
-      Promise.all([
-        getCards(selectedArticleId),
-        getQuizQuestions(selectedArticleId),
-        getProgress(selectedArticleId),
-        getRewards(selectedArticleId),
-      ])
-        .then(([cardsData, quizData, progressData, rewardData]) => {
-          setCards(cardsData);
-          setQuizzes(quizData);
-          setProgress(progressData);
-          setClaimedMilestones(rewardData.map((reward) => reward.milestone));
-        })
-        .catch((error) => {
-          console.error('Failed to refresh path data:', error);
-        })
-        .finally(() => {
-          setIsPathLoading(false);
-        });
+      applyCachedPathData(selectedArticleId);
+      refreshPathData(selectedArticleId, false);
     }
   }, [isActive, selectedArticleId]);
+
+  useEffect(() => {
+    const handleCardsUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ articleId?: string }>).detail;
+      if (!detail?.articleId) return;
+      if (detail.articleId === selectedArticleId) {
+        refreshPathData(detail.articleId, false);
+      }
+    };
+    window.addEventListener('cards:update', handleCardsUpdate);
+    return () => window.removeEventListener('cards:update', handleCardsUpdate);
+  }, [selectedArticleId]);
 
   useEffect(() => {
     const nodes = generateLearningPath({
@@ -171,6 +168,49 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
       return;
     }
     onSelectArticle(selectedArticleId);
+  };
+
+  const applyCachedPathData = (articleId: string) => {
+    const cachedCards = getCardsCacheSnapshot(articleId);
+    if (cachedCards !== undefined) {
+      setCards(cachedCards);
+    }
+    const cachedQuizzes = getQuizCacheSnapshot(articleId);
+    if (cachedQuizzes !== undefined) {
+      setQuizzes(cachedQuizzes);
+    }
+    const cachedProgress = getProgressCacheSnapshot(articleId);
+    if (cachedProgress !== undefined) {
+      setProgress(cachedProgress);
+    }
+    const cachedRewards = getRewardsCacheSnapshot(articleId);
+    if (cachedRewards !== undefined) {
+      setClaimedMilestones(cachedRewards.map((reward) => reward.milestone));
+    }
+  };
+
+  const refreshPathData = async (articleId: string, showLoading = true) => {
+    if (showLoading) {
+      setIsPathLoading(true);
+    }
+    try {
+      const [cardsData, quizData, progressData, rewardData] = await Promise.all([
+        getCards(articleId),
+        getQuizQuestions(articleId),
+        getProgress(articleId),
+        getRewards(articleId),
+      ]);
+      setCards(cardsData);
+      setQuizzes(quizData);
+      setProgress(progressData);
+      setClaimedMilestones(rewardData.map((reward) => reward.milestone));
+    } catch (error) {
+      console.error('Failed to load path data:', error);
+    } finally {
+      if (showLoading) {
+        setIsPathLoading(false);
+      }
+    }
   };
 
   if (isLoading && articles.length === 0) {
@@ -266,9 +306,9 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
             ) : cards.length === 0 ? (
               <div className="bg-white border border-slate-100 rounded-3xl p-6 text-center">
                 <p className="text-base font-semibold text-slate-700">还没有生成学习卡片</p>
-                <p className="text-sm text-slate-400 mt-2">先在新建页导入文章并生成卡片</p>
+                <p className="text-sm text-slate-400 mt-2">进入文章详情页生成卡片</p>
                 <button
-                  onClick={onCreate}
+                  onClick={() => selectedArticleId && onSelectArticle(selectedArticleId)}
                   className="mt-4 px-4 py-2 bg-primary text-white rounded-2xl shadow-[0_4px_0_0_#46a302] active:translate-y-1"
                 >
                   去生成

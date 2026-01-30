@@ -32,10 +32,22 @@ const cache = {
   articles: null as CacheEntry<ArticleWithProgress[]> | null,
   articlesById: new Map<string, CacheEntry<Article>>(),
   cardsByArticleId: new Map<string, CacheEntry<Card[]>>(),
+  progressByArticleId: new Map<string, CacheEntry<LearningProgress | null>>(),
+  rewardsByArticleId: new Map<string, CacheEntry<Reward[]>>(),
   dialogueByArticleId: new Map<string, CacheEntry<DialogueMessage[]>>(),
   galgameByArticleId: new Map<string, CacheEntry<GalgameMessage[]>>(),
   quizByArticleId: new Map<string, CacheEntry<QuizQuestion[]>>(),
 };
+
+function notifyCardsUpdated(articleId: string): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('cards:update', { detail: { articleId } }));
+}
+
+function notifyProgressUpdated(articleId: string, progress: LearningProgress | null): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('progress:update', { detail: { articleId, progress } }));
+}
 
 function isFresh<T>(entry: CacheEntry<T> | null): entry is CacheEntry<T> {
   return !!entry && Date.now() - entry.ts < CACHE_TTL_MS;
@@ -51,6 +63,14 @@ function getCacheEntry<T>(map: Map<string, CacheEntry<T>>, key: string): T | nul
     return entry.data;
   }
   return null;
+}
+
+function getCacheEntryAllowNull<T>(map: Map<string, CacheEntry<T>>, key: string): { hit: boolean; data: T | null } {
+  const entry = map.get(key);
+  if (entry && isFresh(entry)) {
+    return { hit: true, data: entry.data ?? null };
+  }
+  return { hit: false, data: null };
 }
 
 function invalidateArticlesCache(): void {
@@ -75,6 +95,31 @@ function updateArticleCount(
 
 export function getArticlesCacheSnapshot(): ArticleWithProgress[] | null {
   return cache.articles?.data || null;
+}
+
+export function getCardsCacheSnapshot(articleId: string): Card[] | undefined {
+  return cache.cardsByArticleId.get(articleId)?.data;
+}
+
+export function getQuizCacheSnapshot(articleId: string): QuizQuestion[] | undefined {
+  return cache.quizByArticleId.get(articleId)?.data;
+}
+
+export function getDialogueCacheSnapshot(articleId: string): DialogueMessage[] | undefined {
+  return cache.dialogueByArticleId.get(articleId)?.data;
+}
+
+export function getGalgameCacheSnapshot(articleId: string): GalgameMessage[] | undefined {
+  return cache.galgameByArticleId.get(articleId)?.data;
+}
+
+export function getProgressCacheSnapshot(articleId: string): LearningProgress | null | undefined {
+  if (!cache.progressByArticleId.has(articleId)) return undefined;
+  return cache.progressByArticleId.get(articleId)?.data ?? null;
+}
+
+export function getRewardsCacheSnapshot(articleId: string): Reward[] | undefined {
+  return cache.rewardsByArticleId.get(articleId)?.data;
 }
 
 async function getUserId(): Promise<string | null> {
@@ -213,6 +258,8 @@ export async function deleteArticle(id: string): Promise<void> {
   if (error) throw error;
   cache.articlesById.delete(id);
   cache.cardsByArticleId.delete(id);
+  cache.progressByArticleId.delete(id);
+  cache.rewardsByArticleId.delete(id);
   cache.dialogueByArticleId.delete(id);
   cache.galgameByArticleId.delete(id);
   cache.quizByArticleId.delete(id);
@@ -246,7 +293,9 @@ export async function createCards(
   cards: Omit<Card, 'id' | 'article_id' | 'created_at'>[]
 ): Promise<Card[]> {
   if (!(await isAuthenticated())) {
-    return guestStorage.createCards(articleId, cards);
+    const result = await guestStorage.createCards(articleId, cards);
+    notifyCardsUpdated(articleId);
+    return result;
   }
 
   const cardsToInsert = cards.map((card, index) => ({
@@ -265,12 +314,18 @@ export async function createCards(
   const existing = cache.cardsByArticleId.get(articleId)?.data || [];
   setCacheEntry(cache.cardsByArticleId, articleId, [...existing, ...result]);
   updateArticleCount(articleId, 'cardCount', result.length);
+  notifyCardsUpdated(articleId);
   return result;
 }
 
 export async function getProgress(articleId: string): Promise<LearningProgress | null> {
   if (!(await isAuthenticated())) {
     return guestStorage.getProgress(articleId);
+  }
+
+  const cached = getCacheEntryAllowNull(cache.progressByArticleId, articleId);
+  if (cached.hit) {
+    return cached.data;
   }
 
   const { data, error } = await supabase
@@ -280,6 +335,7 @@ export async function getProgress(articleId: string): Promise<LearningProgress |
     .maybeSingle();
 
   if (error) throw error;
+  setCacheEntry(cache.progressByArticleId, articleId, data ?? null);
   return data;
 }
 
@@ -289,7 +345,10 @@ export async function upsertProgress(
   totalCount: number
 ): Promise<LearningProgress> {
   if (!(await isAuthenticated())) {
-    return guestStorage.upsertProgress(articleId, currentIndex, totalCount);
+    const result = await guestStorage.upsertProgress(articleId, currentIndex, totalCount);
+    setCacheEntry(cache.progressByArticleId, articleId, result);
+    notifyProgressUpdated(articleId, result);
+    return result;
   }
 
   const userId = await getUserId();
@@ -311,6 +370,8 @@ export async function upsertProgress(
     .single();
 
   if (error) throw error;
+  setCacheEntry(cache.progressByArticleId, articleId, data);
+  notifyProgressUpdated(articleId, data);
   return data;
 }
 
@@ -319,13 +380,20 @@ export async function getRewards(articleId: string): Promise<Reward[]> {
     return guestStorage.getRewards(articleId);
   }
 
+  const cached = getCacheEntry(cache.rewardsByArticleId, articleId);
+  if (cached) {
+    return cached;
+  }
+
   const { data, error } = await supabase
     .from('rewards')
     .select('*')
     .eq('article_id', articleId);
 
   if (error) throw error;
-  return data || [];
+  const result = data || [];
+  setCacheEntry(cache.rewardsByArticleId, articleId, result);
+  return result;
 }
 
 export async function claimReward(
@@ -354,6 +422,8 @@ export async function claimReward(
     if (error.code === '23505') return null;
     throw error;
   }
+  const existing = cache.rewardsByArticleId.get(articleId)?.data || [];
+  setCacheEntry(cache.rewardsByArticleId, articleId, [...existing, data]);
   return data;
 }
 
@@ -781,7 +851,14 @@ export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[
     .eq('article_id', articleId)
     .order('sequence_order', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST205') {
+      const result: QuizQuestion[] = [];
+      setCacheEntry(cache.quizByArticleId, articleId, result);
+      return result;
+    }
+    throw error;
+  }
   const result = data || [];
   setCacheEntry(cache.quizByArticleId, articleId, result);
   return result;
