@@ -20,6 +20,7 @@ interface HomeProps {
   onCreate: () => void;
   onOpenNode?: (node: PathNode, articleId: string) => void;
   onCurrentArticleChange?: (id: string) => void;
+  isActive?: boolean;
 }
 
 function getArticleActivityTime(article: ArticleWithProgress): number {
@@ -38,7 +39,7 @@ function getDefaultArticleId(articles: ArticleWithProgress[]): string | null {
   return latest.id;
 }
 
-export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleChange }: HomeProps) {
+export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleChange, isActive = true }: HomeProps) {
   const { user } = useAuth();
   const cachedArticles = getArticlesCacheSnapshot();
   const [articles, setArticles] = useState<ArticleWithProgress[]>(cachedArticles || []);
@@ -61,27 +62,27 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
     [articles, selectedArticleId]
   );
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const [articlesData, points] = await Promise.all([getArticles(), getTotalPoints()]);
-        setArticles(articlesData);
-        setTotalPoints(points);
-        setSelectedArticleId((current) => {
-          if (current && articlesData.some((article) => article.id === current)) {
-            return current;
-          }
-          return getDefaultArticleId(articlesData);
-        });
-      } catch (error) {
-        console.error('Failed to load home data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadHomeData = async () => {
+    setIsLoading(true);
+    try {
+      const [articlesData, points] = await Promise.all([getArticles(), getTotalPoints()]);
+      setArticles(articlesData);
+      setTotalPoints(points);
+      setSelectedArticleId((current) => {
+        if (current && articlesData.some((article) => article.id === current)) {
+          return current;
+        }
+        return getDefaultArticleId(articlesData);
+      });
+    } catch (error) {
+      console.error('Failed to load home data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    loadData();
+  useEffect(() => {
+    loadHomeData();
   }, [user]);
 
   useEffect(() => {
@@ -120,6 +121,32 @@ export function Home({ onSelectArticle, onCreate, onOpenNode, onCurrentArticleCh
 
     loadPathData();
   }, [selectedArticleId]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    loadHomeData();
+    if (selectedArticleId) {
+      setIsPathLoading(true);
+      Promise.all([
+        getCards(selectedArticleId),
+        getQuizQuestions(selectedArticleId),
+        getProgress(selectedArticleId),
+        getRewards(selectedArticleId),
+      ])
+        .then(([cardsData, quizData, progressData, rewardData]) => {
+          setCards(cardsData);
+          setQuizzes(quizData);
+          setProgress(progressData);
+          setClaimedMilestones(rewardData.map((reward) => reward.milestone));
+        })
+        .catch((error) => {
+          console.error('Failed to refresh path data:', error);
+        })
+        .finally(() => {
+          setIsPathLoading(false);
+        });
+    }
+  }, [isActive, selectedArticleId]);
 
   useEffect(() => {
     const nodes = generateLearningPath({

@@ -170,6 +170,7 @@ function AppContent() {
             }}
             onCreate={() => setView({ tab: 'create' })}
             onCurrentArticleChange={(id) => setLastArticleId(id)}
+            isActive={showHome}
           />
         </div>
       )}
