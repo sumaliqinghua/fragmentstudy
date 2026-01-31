@@ -19,6 +19,9 @@ export class AIResponseParseError extends Error {
 }
 
 function getProxyUrl(): string {
+  if (import.meta.env.DEV) {
+    return '/openai-proxy';
+  }
   return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-proxy`;
 }
 
