@@ -9,6 +9,7 @@ export interface Article {
   original_content: string;
   mode: ArticleMode;
   characters?: string;
+  tagIds?: string[];
   created_at: string;
 }
 
@@ -51,6 +52,20 @@ export interface ArticleWithProgress extends Article {
   messageCount?: number;
   galgameMessageCount?: number;
   quizCount?: number;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+}
+
+export interface ArticleTag {
+  id: string;
+  article_id: string;
+  tag_id: string;
+  created_at: string;
 }
 
 export interface DialogueMessage {

@@ -19,6 +19,7 @@ import type {
   ArticleTextQA,
   QuizQuestion,
   QuizGenerationResult,
+  Tag,
 } from '../types';
 
 type CacheEntry<T> = {
@@ -31,6 +32,8 @@ const CACHE_TTL_MS = Number.POSITIVE_INFINITY;
 const cache = {
   articles: null as CacheEntry<ArticleWithProgress[]> | null,
   articlesById: new Map<string, CacheEntry<Article>>(),
+  tags: null as CacheEntry<Tag[]> | null,
+  articleTagsByArticleId: new Map<string, CacheEntry<string[]>>(),
   cardsByArticleId: new Map<string, CacheEntry<Card[]>>(),
   progressByArticleId: new Map<string, CacheEntry<LearningProgress | null>>(),
   rewardsByArticleId: new Map<string, CacheEntry<Reward[]>>(),
@@ -79,6 +82,20 @@ function invalidateArticlesCache(): void {
   cache.articles = null;
 }
 
+function updateArticleTagsInCache(articleId: string, tagIds: string[]): void {
+  if (cache.articles?.data) {
+    const next = cache.articles.data.map(article => (
+      article.id === articleId ? { ...article, tagIds } : article
+    ));
+    cache.articles = { data: next, ts: Date.now() };
+  }
+  const cachedArticle = cache.articlesById.get(articleId);
+  if (cachedArticle) {
+    cache.articlesById.set(articleId, { data: { ...cachedArticle.data, tagIds }, ts: Date.now() });
+  }
+  setCacheEntry(cache.articleTagsByArticleId, articleId, tagIds);
+}
+
 function updateArticleCount(
   articleId: string,
   field: 'cardCount' | 'messageCount' | 'galgameMessageCount' | 'quizCount',
@@ -97,6 +114,10 @@ function updateArticleCount(
 
 export function getArticlesCacheSnapshot(): ArticleWithProgress[] | null {
   return cache.articles?.data || null;
+}
+
+export function getTagsCacheSnapshot(): Tag[] | null {
+  return cache.tags?.data || null;
 }
 
 export function getCardsCacheSnapshot(articleId: string): Card[] | undefined {
@@ -134,6 +155,60 @@ async function isAuthenticated(): Promise<boolean> {
   return userId !== null;
 }
 
+const missingTables = new Set<string>();
+
+function isMissingTableError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as { code?: string; status?: number; message?: string };
+  if (err.code === 'PGRST205') return true;
+  if (err.status === 404) return true;
+  if (err.message && err.message.includes('Could not find the table')) return true;
+  return false;
+}
+
+async function getArticleTagsForArticles(articleIds: string[]): Promise<Map<string, string[]>> {
+  if (articleIds.length === 0) return new Map();
+
+  if (!(await isAuthenticated())) {
+    return guestStorage.getArticleTagsForArticles(articleIds);
+  }
+
+  if (missingTables.has('article_tags')) {
+    const empty = new Map<string, string[]>();
+    for (const articleId of articleIds) {
+      empty.set(articleId, []);
+    }
+    return empty;
+  }
+
+  const { data, error } = await supabase
+    .from('article_tags')
+    .select('article_id, tag_id')
+    .in('article_id', articleIds);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('article_tags');
+      const empty = new Map<string, string[]>();
+      for (const articleId of articleIds) {
+        empty.set(articleId, []);
+      }
+      return empty;
+    }
+    throw error;
+  }
+  const result = new Map<string, string[]>();
+  for (const articleId of articleIds) {
+    result.set(articleId, []);
+  }
+  for (const row of data || []) {
+    const list = result.get(row.article_id) || [];
+    list.push(row.tag_id);
+    result.set(row.article_id, list);
+  }
+  return result;
+}
+
 export async function getArticles(): Promise<ArticleWithProgress[]> {
   if (!(await isAuthenticated())) {
     return guestStorage.getArticles();
@@ -151,6 +226,8 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
   if (error) throw error;
   if (!articles) return [];
 
+  const articleIds = articles.map(article => article.id);
+  const articleTagsMap = await getArticleTagsForArticles(articleIds);
   const articlesWithProgress = await Promise.all(
     articles.map(async (article) => {
       const { data: progress } = await supabase
@@ -180,13 +257,15 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
 
       const enriched: ArticleWithProgress = {
         ...article,
+        tagIds: articleTagsMap.get(article.id) || [],
         progress: progress || undefined,
         cardCount: cardCount || 0,
         messageCount: messageCount || 0,
         galgameMessageCount: galgameMessageCount || 0,
         quizCount: quizCount || 0,
       };
-      cache.articlesById.set(article.id, { data: article, ts: Date.now() });
+      cache.articlesById.set(article.id, { data: enriched, ts: Date.now() });
+      setCacheEntry(cache.articleTagsByArticleId, article.id, enriched.tagIds || []);
       return enriched;
     })
   );
@@ -219,10 +298,12 @@ export async function getArticle(id: string): Promise<Article | null> {
     .maybeSingle();
 
   if (error) throw error;
-  if (data) {
-    cache.articlesById.set(id, { data, ts: Date.now() });
-  }
-  return data;
+  if (!data) return null;
+  const tagIds = (await getArticleTagsForArticles([id])).get(id) || [];
+  const enriched: Article = { ...data, tagIds };
+  cache.articlesById.set(id, { data: enriched, ts: Date.now() });
+  setCacheEntry(cache.articleTagsByArticleId, id, tagIds);
+  return enriched;
 }
 
 export async function createArticle(
@@ -259,6 +340,7 @@ export async function deleteArticle(id: string): Promise<void> {
 
   if (error) throw error;
   cache.articlesById.delete(id);
+  cache.articleTagsByArticleId.delete(id);
   cache.cardsByArticleId.delete(id);
   cache.progressByArticleId.delete(id);
   cache.rewardsByArticleId.delete(id);
@@ -266,6 +348,127 @@ export async function deleteArticle(id: string): Promise<void> {
   cache.galgameByArticleId.delete(id);
   cache.quizByArticleId.delete(id);
   invalidateArticlesCache();
+}
+
+export async function getTags(): Promise<Tag[]> {
+  if (!(await isAuthenticated())) {
+    return guestStorage.getTags();
+  }
+
+  if (missingTables.has('tags')) {
+    return [];
+  }
+
+  if (isFresh(cache.tags)) {
+    return cache.tags.data;
+  }
+
+  const { data, error } = await supabase
+    .from('tags')
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('tags');
+      return [];
+    }
+    throw error;
+  }
+  const result = data || [];
+  cache.tags = { data: result, ts: Date.now() };
+  return result;
+}
+
+export async function createTag(name: string, parentId: string | null): Promise<Tag> {
+  if (!(await isAuthenticated())) {
+    const tag = await guestStorage.createTag(name, parentId);
+    cache.tags = null;
+    return tag;
+  }
+
+  if (missingTables.has('tags')) {
+    throw new Error('标签表未创建，请先执行 Supabase 迁移。');
+  }
+
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('tags')
+    .insert({ name, parent_id: parentId, user_id: userId })
+    .select()
+    .single();
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('tags');
+      throw new Error('标签表未创建，请先执行 Supabase 迁移。');
+    }
+    throw error;
+  }
+  cache.tags = null;
+  return data;
+}
+
+export async function ensureTagPath(path: string): Promise<string | null> {
+  const trimmed = path.trim();
+  if (!trimmed) return null;
+  const segments = trimmed.split('/').map(seg => seg.trim()).filter(Boolean);
+  if (segments.length === 0) return null;
+
+  let currentParentId: string | null = null;
+  let tags = await getTags();
+
+  for (const segment of segments) {
+    const existing = tags.find(tag => tag.name === segment && tag.parent_id === currentParentId) || null;
+    if (existing) {
+      currentParentId = existing.id;
+      continue;
+    }
+    const created = await createTag(segment, currentParentId);
+    tags = [...tags, created];
+    currentParentId = created.id;
+  }
+  return currentParentId;
+}
+
+export async function ensureTagPaths(paths: string[]): Promise<string[]> {
+  const tagIds: string[] = [];
+  for (const path of paths) {
+    const tagId = await ensureTagPath(path);
+    if (tagId) tagIds.push(tagId);
+  }
+  return Array.from(new Set(tagIds));
+}
+
+export async function setArticleTags(articleId: string, tagIds: string[]): Promise<void> {
+  if (!(await isAuthenticated())) {
+    await guestStorage.setArticleTags(articleId, tagIds);
+    updateArticleTagsInCache(articleId, tagIds);
+    return;
+  }
+
+  if (missingTables.has('article_tags')) return;
+
+  const userId = await getUserId();
+  const { error: deleteError } = await supabase.from('article_tags').delete().eq('article_id', articleId);
+  if (deleteError) {
+    if (isMissingTableError(deleteError)) return;
+    throw deleteError;
+  }
+
+  if (tagIds.length > 0) {
+    const rows = tagIds.map(tagId => ({
+      article_id: articleId,
+      tag_id: tagId,
+      user_id: userId,
+    }));
+    const { error } = await supabase.from('article_tags').insert(rows);
+    if (error) {
+      if (isMissingTableError(error)) return;
+      throw error;
+    }
+  }
+  updateArticleTagsInCache(articleId, tagIds);
 }
 
 export async function getCards(articleId: string): Promise<Card[]> {
@@ -842,6 +1045,10 @@ export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[
     return guestStorage.getQuizQuestions(articleId);
   }
 
+  if (missingTables.has('quiz_questions')) {
+    return [];
+  }
+
   const cached = getCacheEntry(cache.quizByArticleId, articleId);
   if (cached) {
     return cached;
@@ -854,7 +1061,8 @@ export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[
     .order('sequence_order', { ascending: true });
 
   if (error) {
-    if (error.code === 'PGRST205') {
+    if (isMissingTableError(error)) {
+      missingTables.add('quiz_questions');
       const result: QuizQuestion[] = [];
       setCacheEntry(cache.quizByArticleId, articleId, result);
       return result;
@@ -907,6 +1115,10 @@ export async function createQuizQuestions(
     return guestStorage.createQuizQuestions(articleId, questions);
   }
 
+  if (missingTables.has('quiz_questions')) {
+    throw new Error('题库表未创建，请先执行 Supabase 迁移。');
+  }
+
   const questionsToInsert = questions.map((question, index) => ({
     ...question,
     article_id: articleId,
@@ -918,7 +1130,13 @@ export async function createQuizQuestions(
     .insert(questionsToInsert)
     .select();
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('quiz_questions');
+      throw new Error('题库表未创建，请先执行 Supabase 迁移。');
+    }
+    throw error;
+  }
   const result = data || [];
   const existing = cache.quizByArticleId.get(articleId)?.data || [];
   setCacheEntry(cache.quizByArticleId, articleId, [...existing, ...result]);

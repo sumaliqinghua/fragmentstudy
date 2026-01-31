@@ -12,12 +12,15 @@ import {
   getRewardsCacheSnapshot,
   getTotalPoints,
   getArticlesCacheSnapshot,
+  getTags,
 } from '../services/dataService';
 import { LearningPath } from '../components/LearningPath';
 import { generateLearningPath, type PathNode } from '../utils/pathGenerator';
-import type { ArticleWithProgress, Card, LearningProgress, QuizQuestion } from '../types';
+import type { ArticleWithProgress, Card, LearningProgress, QuizQuestion, Tag } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { getStreakDays } from '../utils/streak';
+
+const UNCATEGORIZED_TAG_ID = 'uncategorized';
 
 interface HomeProps {
   onSelectArticle: (id: string) => void;
@@ -61,6 +64,8 @@ export function Home({
   const [totalPoints, setTotalPoints] = useState(0);
   const [isLoading, setIsLoading] = useState(!cachedArticles);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
   const [progress, setProgress] = useState<LearningProgress | null>(null);
@@ -72,6 +77,74 @@ export function Home({
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) || null,
     [articles, selectedArticleId]
+  );
+
+  const tagsById = useMemo(() => new Map(tags.map(tag => [tag.id, tag])), [tags]);
+
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string | null, Tag[]>();
+    for (const tag of tags) {
+      const key = tag.parent_id ?? null;
+      const list = map.get(key) || [];
+      list.push(tag);
+      map.set(key, list);
+    }
+    for (const [key, list] of map.entries()) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      map.set(key, list);
+    }
+    return map;
+  }, [tags]);
+
+  const descendantMap = useMemo(() => {
+    const cache = new Map<string, Set<string>>();
+    const build = (tagId: string): Set<string> => {
+      if (cache.has(tagId)) return cache.get(tagId)!;
+      const set = new Set<string>([tagId]);
+      const children = childrenByParent.get(tagId) || [];
+      for (const child of children) {
+        for (const id of build(child.id)) {
+          set.add(id);
+        }
+      }
+      cache.set(tagId, set);
+      return set;
+    };
+    tags.forEach(tag => build(tag.id));
+    return cache;
+  }, [tags, childrenByParent]);
+
+  const filteredArticles = useMemo(() => {
+    if (!selectedTagId) return articles;
+    if (selectedTagId === UNCATEGORIZED_TAG_ID) {
+      return articles.filter(article => (article.tagIds || []).length === 0);
+    }
+    const descendants = descendantMap.get(selectedTagId) || new Set([selectedTagId]);
+    return articles.filter(article => (article.tagIds || []).some(tagId => descendants.has(tagId)));
+  }, [articles, selectedTagId, descendantMap]);
+
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const tag of tags) {
+      counts.set(tag.id, 0);
+    }
+    for (const tag of tags) {
+      const descendants = descendantMap.get(tag.id) || new Set([tag.id]);
+      let count = 0;
+      for (const article of articles) {
+        const tagIds = article.tagIds || [];
+        if (tagIds.some(tagId => descendants.has(tagId))) {
+          count += 1;
+        }
+      }
+      counts.set(tag.id, count);
+    }
+    return counts;
+  }, [tags, articles, descendantMap]);
+
+  const uncategorizedCount = useMemo(
+    () => articles.filter(article => (article.tagIds || []).length === 0).length,
+    [articles]
   );
 
   const loadHomeData = async () => {
@@ -101,10 +174,38 @@ export function Home({
   }, [user]);
 
   useEffect(() => {
-    if (activeArticleId && activeArticleId !== selectedArticleId) {
-      setSelectedArticleId(activeArticleId);
+    const loadTags = async () => {
+      try {
+        const tagsData = await getTags();
+        setTags(tagsData);
+      } catch (error) {
+        console.error('Failed to load tags:', error);
+      }
+    };
+    loadTags();
+  }, [user]);
+
+  useEffect(() => {
+    if (filteredArticles.length === 0) {
+      if (selectedArticleId !== null) {
+        setSelectedArticleId(null);
+      }
+      return;
     }
-  }, [activeArticleId, selectedArticleId]);
+    const currentCandidate = selectedArticleId && filteredArticles.some(article => article.id === selectedArticleId)
+      ? selectedArticleId
+      : null;
+    if (currentCandidate) {
+      return;
+    }
+    const activeCandidate = activeArticleId && filteredArticles.some(article => article.id === activeArticleId)
+      ? activeArticleId
+      : null;
+    const nextId = activeCandidate ?? filteredArticles[0].id;
+    if (nextId !== selectedArticleId) {
+      setSelectedArticleId(nextId);
+    }
+  }, [activeArticleId, filteredArticles, selectedArticleId]);
 
   useEffect(() => {
     const syncStreak = () => setStreakDays(getStreakDays());
@@ -126,6 +227,8 @@ export function Home({
     }
   }, [selectedArticleId]);
 
+  // 由上面的“统一选择逻辑”负责同步 selectedArticleId
+
   useEffect(() => {
     if (!isActive) return;
     loadHomeData();
@@ -135,7 +238,7 @@ export function Home({
         refreshPathData(selectedArticleId, true);
       }
     }
-  }, [isActive, selectedArticleId]);
+  }, [isActive]);
 
   useEffect(() => {
     const handleCardsUpdate = (event: Event) => {
@@ -261,12 +364,17 @@ export function Home({
                 <p className="text-sm font-semibold text-slate-800 font-display max-w-[180px] truncate">
                   {selectedArticle?.title || '请选择文章'}
                 </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  标签：{selectedTagId
+                    ? (selectedTagId === UNCATEGORIZED_TAG_ID ? '未分类' : (tagsById.get(selectedTagId)?.name || '未知'))
+                    : '全部'}
+                </p>
               </div>
               <ChevronDown className="w-4 h-4 text-slate-500" />
             </button>
             {showDropdown && (
               <div className="absolute mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-lg z-20 overflow-hidden">
-                {articles.map((article) => (
+                {filteredArticles.map((article) => (
                   <button
                     key={article.id}
                     onClick={() => handleSelectArticle(article.id)}
@@ -275,7 +383,7 @@ export function Home({
                     {article.title}
                   </button>
                 ))}
-                {articles.length === 0 && (
+                {filteredArticles.length === 0 && (
                   <div className="px-4 py-3 text-sm text-slate-400">暂无文章</div>
                 )}
               </div>
@@ -294,6 +402,86 @@ export function Home({
           </div>
         </header>
 
+        <section className="mt-6 bg-white border border-slate-100 rounded-3xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">标签筛选</h3>
+              <p className="text-xs text-slate-400 mt-1">支持层级标签，未打标签的文章统一在“未分类”下</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button
+              onClick={() => setSelectedTagId(null)}
+              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                selectedTagId === null
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              全部 ({articles.length})
+            </button>
+            <button
+              onClick={() => setSelectedTagId(UNCATEGORIZED_TAG_ID)}
+              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                selectedTagId === UNCATEGORIZED_TAG_ID
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              未分类 ({uncategorizedCount})
+            </button>
+            {(childrenByParent.get(null) || []).map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => setSelectedTagId(tag.id)}
+                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                  selectedTagId === tag.id
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {tag.name} ({tagCounts.get(tag.id) || 0})
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-400">标签目录</p>
+            <div className="mt-2 max-h-64 overflow-auto space-y-1">
+              <button
+                onClick={() => setSelectedTagId(UNCATEGORIZED_TAG_ID)}
+                className={`w-full text-left text-sm px-2 py-1 rounded-lg transition-colors ${
+                  selectedTagId === UNCATEGORIZED_TAG_ID
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                未分类 ({uncategorizedCount})
+              </button>
+              {(childrenByParent.get(null) || []).map((tag) => {
+                const renderNode = (node: Tag, depth: number): JSX.Element => {
+                  const isActive = selectedTagId === node.id;
+                  return (
+                    <div key={node.id}>
+                      <button
+                        onClick={() => setSelectedTagId(node.id)}
+                        className={`w-full text-left text-sm px-2 py-1 rounded-lg transition-colors ${
+                          isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                        style={{ paddingLeft: 8 + depth * 12 }}
+                      >
+                        {node.name} ({tagCounts.get(node.id) || 0})
+                      </button>
+                      {(childrenByParent.get(node.id) || []).map((child) => renderNode(child, depth + 1))}
+                    </div>
+                  );
+                };
+                return renderNode(tag, 0);
+              })}
+            </div>
+          </div>
+        </section>
+
         {articles.length === 0 ? (
           <div className="mt-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-10">
             <p className="text-lg font-semibold text-slate-700">导入你的第一篇文章</p>
@@ -304,6 +492,18 @@ export function Home({
             >
               <Plus className="w-4 h-4" />
               立即开始
+            </button>
+          </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="mt-10 bg-white border border-slate-100 rounded-3xl p-8 text-center">
+            <p className="text-base font-semibold text-slate-700">该标签下暂无文章</p>
+            <p className="text-sm text-slate-400 mt-2">可以切换标签，或新增文章后再试</p>
+            <button
+              onClick={onCreate}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-2xl shadow-[0_6px_0_0_#245aa3] active:translate-y-1"
+            >
+              <Plus className="w-4 h-4" />
+              新增文章
             </button>
           </div>
         ) : (

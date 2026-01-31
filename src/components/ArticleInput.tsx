@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { DragEvent } from 'react';
 import { X, FileText, Sparkles, UploadCloud } from 'lucide-react';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf';
-import { createArticle } from '../services/dataService';
+import { createArticle, ensureTagPaths, setArticleTags } from '../services/dataService';
 import { AIResponseParseError, generateLearningArticle, isConfigured } from '../services/openai';
 
 GlobalWorkerOptions.workerSrc = new URL(
@@ -27,6 +27,7 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
+  const [tagInput, setTagInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isParsingPdf, setIsParsingPdf] = useState(false);
   const [pdfFileName, setPdfFileName] = useState('');
@@ -40,6 +41,7 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
     setTitle('');
     setContent('');
     setAiPrompt('');
+    setTagInput('');
     setIsGenerating(false);
     setIsParsingPdf(false);
     setPdfFileName('');
@@ -73,7 +75,20 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
 
     try {
       setProcessingStatus('保存文章...');
-      await createArticle(title, content, 'source');
+      const article = await createArticle(title, content, 'source');
+      const tagPaths = tagInput
+        .split(/[，,]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (tagPaths.length > 0) {
+        setProcessingStatus('保存标签...');
+        try {
+          const tagIds = await ensureTagPaths(tagPaths);
+          await setArticleTags(article.id, tagIds);
+        } catch (tagError) {
+          console.warn('保存标签失败：', tagError);
+        }
+      }
       setProcessingStatus('完成!');
       setTimeout(() => {
         resetForm();
@@ -223,6 +238,20 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
                   placeholder="输入内容标题..."
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  标签（可选）
+                </label>
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  placeholder="多个标签用逗号分隔，层级用 / 表示，例如：计算机/编程, 文学/诗歌"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-2">未填写则归入“未分类”。</p>
               </div>
 
               {mode === 'paste' && (

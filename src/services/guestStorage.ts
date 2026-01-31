@@ -17,6 +17,8 @@ import type {
   ArticleTextQA,
   QuizQuestion,
   QuizGenerationResult,
+  Tag,
+  ArticleTag,
 } from '../types';
 
 const STORAGE_PREFIX = 'guest_';
@@ -130,9 +132,26 @@ function setQuizQuestionsStore(articleId: string, questions: QuizQuestion[]): vo
   setItem(`quiz_${articleId}`, questions);
 }
 
+function getTagsStore(): Tag[] {
+  return getItem<Tag[]>('tags') || [];
+}
+
+function setTagsStore(tags: Tag[]): void {
+  setItem('tags', tags);
+}
+
+function getArticleTagsStore(): ArticleTag[] {
+  return getItem<ArticleTag[]>('article_tags') || [];
+}
+
+function setArticleTagsStore(articleTags: ArticleTag[]): void {
+  setItem('article_tags', articleTags);
+}
+
 export async function getArticles(): Promise<ArticleWithProgress[]> {
   const articles = getArticlesStore();
   const progressStore = getProgressStore();
+  const articleTags = getArticleTagsStore();
 
   return articles.map(article => {
     const progress = progressStore[article.id];
@@ -140,8 +159,10 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
     const dialogueMessages = getDialogueMessagesStore(article.id);
     const galgameMessages = getGalgameMessagesStore(article.id);
     const quizQuestions = getQuizQuestionsStore(article.id);
+    const tagIds = articleTags.filter(tag => tag.article_id === article.id).map(tag => tag.tag_id);
     return {
       ...article,
+      tagIds,
       progress,
       cardCount: cards.length,
       messageCount: dialogueMessages.length,
@@ -153,7 +174,12 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
 
 export async function getArticle(id: string): Promise<Article | null> {
   const articles = getArticlesStore();
-  return articles.find(a => a.id === id) || null;
+  const article = articles.find(a => a.id === id) || null;
+  if (!article) return null;
+  const tagIds = getArticleTagsStore()
+    .filter(tag => tag.article_id === id)
+    .map(tag => tag.tag_id);
+  return { ...article, tagIds };
 }
 
 export async function createArticle(
@@ -168,6 +194,7 @@ export async function createArticle(
     original_content: content,
     mode,
     characters,
+    tagIds: [],
     created_at: new Date().toISOString(),
   };
 
@@ -193,6 +220,55 @@ export async function deleteArticle(id: string): Promise<void> {
 
   const rewards = getRewardsStore();
   setRewardsStore(rewards.filter(r => r.article_id !== id));
+
+  const articleTags = getArticleTagsStore();
+  setArticleTagsStore(articleTags.filter(tag => tag.article_id !== id));
+}
+
+export async function getTags(): Promise<Tag[]> {
+  return getTagsStore();
+}
+
+export async function createTag(name: string, parentId: string | null): Promise<Tag> {
+  const tag: Tag = {
+    id: generateId(),
+    name,
+    parent_id: parentId,
+    created_at: new Date().toISOString(),
+  };
+  const tags = getTagsStore();
+  tags.push(tag);
+  setTagsStore(tags);
+  return tag;
+}
+
+export async function setArticleTags(articleId: string, tagIds: string[]): Promise<void> {
+  const articleTags = getArticleTagsStore().filter(tag => tag.article_id !== articleId);
+  const next = [
+    ...articleTags,
+    ...tagIds.map(tagId => ({
+      id: generateId(),
+      article_id: articleId,
+      tag_id: tagId,
+      created_at: new Date().toISOString(),
+    })),
+  ];
+  setArticleTagsStore(next);
+}
+
+export async function getArticleTagsForArticles(articleIds: string[]): Promise<Map<string, string[]>> {
+  const articleTags = getArticleTagsStore();
+  const result = new Map<string, string[]>();
+  for (const articleId of articleIds) {
+    result.set(articleId, []);
+  }
+  for (const tag of articleTags) {
+    if (!result.has(tag.article_id)) continue;
+    const list = result.get(tag.article_id) || [];
+    list.push(tag.tag_id);
+    result.set(tag.article_id, list);
+  }
+  return result;
 }
 
 export async function getCards(articleId: string): Promise<Card[]> {
