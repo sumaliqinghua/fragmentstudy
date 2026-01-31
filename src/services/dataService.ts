@@ -26,7 +26,7 @@ type CacheEntry<T> = {
   ts: number;
 };
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = Number.POSITIVE_INFINITY;
 
 const cache = {
   articles: null as CacheEntry<ArticleWithProgress[]> | null,
@@ -50,7 +50,9 @@ function notifyProgressUpdated(articleId: string, progress: LearningProgress | n
 }
 
 function isFresh<T>(entry: CacheEntry<T> | null): entry is CacheEntry<T> {
-  return !!entry && Date.now() - entry.ts < CACHE_TTL_MS;
+  if (!entry) return false;
+  if (CACHE_TTL_MS === Number.POSITIVE_INFINITY) return true;
+  return Date.now() - entry.ts < CACHE_TTL_MS;
 }
 
 function setCacheEntry<T>(map: Map<string, CacheEntry<T>>, key: string, data: T): void {

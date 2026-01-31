@@ -121,7 +121,9 @@ export function Home({
     onCurrentArticleChange?.(selectedArticleId);
 
     applyCachedPathData(selectedArticleId);
-    refreshPathData(selectedArticleId, true);
+    if (!hasPathCache(selectedArticleId)) {
+      refreshPathData(selectedArticleId, true);
+    }
   }, [selectedArticleId]);
 
   useEffect(() => {
@@ -129,7 +131,9 @@ export function Home({
     loadHomeData();
     if (selectedArticleId) {
       applyCachedPathData(selectedArticleId);
-      refreshPathData(selectedArticleId, false);
+      if (!hasPathCache(selectedArticleId)) {
+        refreshPathData(selectedArticleId, true);
+      }
     }
   }, [isActive, selectedArticleId]);
 
@@ -138,11 +142,23 @@ export function Home({
       const detail = (event as CustomEvent<{ articleId?: string }>).detail;
       if (!detail?.articleId) return;
       if (detail.articleId === selectedArticleId) {
-        refreshPathData(detail.articleId, false);
+        applyCachedPathData(detail.articleId);
       }
     };
     window.addEventListener('cards:update', handleCardsUpdate);
     return () => window.removeEventListener('cards:update', handleCardsUpdate);
+  }, [selectedArticleId]);
+
+  useEffect(() => {
+    const handleProgressUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ articleId?: string; progress?: LearningProgress | null }>).detail;
+      if (!detail?.articleId) return;
+      if (detail.articleId === selectedArticleId) {
+        setProgress(detail.progress ?? null);
+      }
+    };
+    window.addEventListener('progress:update', handleProgressUpdate);
+    return () => window.removeEventListener('progress:update', handleProgressUpdate);
   }, [selectedArticleId]);
 
   useEffect(() => {
@@ -169,6 +185,13 @@ export function Home({
     }
     onSelectArticle(selectedArticleId);
   };
+
+  const hasPathCache = (articleId: string) => (
+    getCardsCacheSnapshot(articleId) !== undefined
+    && getQuizCacheSnapshot(articleId) !== undefined
+    && getProgressCacheSnapshot(articleId) !== undefined
+    && getRewardsCacheSnapshot(articleId) !== undefined
+  );
 
   const applyCachedPathData = (articleId: string) => {
     const cachedCards = getCardsCacheSnapshot(articleId);
