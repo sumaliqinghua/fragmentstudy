@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Flame, Gem, Plus, Tag as TagIcon, X } from 'lucide-react';
 import {
   getArticles,
+  getArticlesLite,
   getCards,
   getCardsCacheSnapshot,
   getProgress,
@@ -74,6 +75,8 @@ export function Home({
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
   const [isPathLoading, setIsPathLoading] = useState(false);
   const [streakDays, setStreakDays] = useState(() => getStreakDays());
+  const isInitialLoading = isLoading && articles.length === 0;
+  const showEmptyState = !isLoading && articles.length === 0;
 
   const selectedArticle = useMemo(
     () => articles.find((article) => article.id === selectedArticleId) || null,
@@ -148,26 +151,41 @@ export function Home({
     [articles]
   );
 
+  const applyArticles = (articlesData: ArticleWithProgress[]) => {
+    setArticles(articlesData);
+    setSelectedArticleId((current) => {
+      const preferred = activeArticleId && articlesData.some((article) => article.id === activeArticleId)
+        ? activeArticleId
+        : current;
+      if (preferred && articlesData.some((article) => article.id === preferred)) {
+        return preferred;
+      }
+      return getDefaultArticleId(articlesData);
+    });
+  };
+
   const loadHomeData = async () => {
     setIsLoading(true);
     try {
-      const [articlesData, points] = await Promise.all([getArticles(), getTotalPoints()]);
-      setArticles(articlesData);
-      setTotalPoints(points);
-      setSelectedArticleId((current) => {
-        const preferred = activeArticleId && articlesData.some((article) => article.id === activeArticleId)
-          ? activeArticleId
-          : current;
-        if (preferred && articlesData.some((article) => article.id === preferred)) {
-          return preferred;
-        }
-        return getDefaultArticleId(articlesData);
-      });
+      const articlesData = await getArticlesLite();
+      applyArticles(articlesData);
     } catch (error) {
       console.error('Failed to load home data:', error);
     } finally {
       setIsLoading(false);
     }
+
+    void getArticles()
+      .then(applyArticles)
+      .catch((error) => {
+        console.error('Failed to refresh articles:', error);
+      });
+
+    void getTotalPoints()
+      .then(setTotalPoints)
+      .catch((error) => {
+        console.error('Failed to load points:', error);
+      });
   };
 
   useEffect(() => {
@@ -175,15 +193,18 @@ export function Home({
   }, [user]);
 
   useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tagsData = await getTags();
-        setTags(tagsData);
-      } catch (error) {
-        console.error('Failed to load tags:', error);
-      }
+    const loadTags = () => {
+      getTags()
+        .then(setTags)
+        .catch((error) => {
+          console.error('Failed to load tags:', error);
+        });
     };
-    loadTags();
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(loadTags);
+    } else {
+      setTimeout(loadTags, 0);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -345,17 +366,6 @@ export function Home({
     }
   };
 
-  if (isLoading && articles.length === 0) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-slate-500">加载中...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
       <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 pt-6">
@@ -368,10 +378,12 @@ export function Home({
               <div>
                 <p className="text-xs text-slate-400">当前文章</p>
                 <p className="text-sm font-semibold text-slate-800 font-display max-w-[180px] truncate">
-                  {selectedArticle?.title || '请选择文章'}
+                  {isInitialLoading ? '加载中...' : (selectedArticle?.title || '请选择文章')}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  标签：{selectedTagId
+                  标签：{isInitialLoading
+                    ? '加载中'
+                    : selectedTagId
                     ? (selectedTagId === UNCATEGORIZED_TAG_ID ? '未分类' : (tagsById.get(selectedTagId)?.name || '未知'))
                     : '全部'}
                 </p>
@@ -380,7 +392,10 @@ export function Home({
             </button>
             {showDropdown && (
               <div className="absolute mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-lg z-20 overflow-hidden">
-                {filteredArticles.map((article) => (
+                {isInitialLoading && (
+                  <div className="px-4 py-3 text-sm text-slate-400">加载中...</div>
+                )}
+                {!isInitialLoading && filteredArticles.map((article) => (
                   <button
                     key={article.id}
                     onClick={() => handleSelectArticle(article.id)}
@@ -389,7 +404,7 @@ export function Home({
                     {article.title}
                   </button>
                 ))}
-                {filteredArticles.length === 0 && (
+                {!isInitialLoading && filteredArticles.length === 0 && (
                   <div className="px-4 py-3 text-sm text-slate-400">暂无文章</div>
                 )}
               </div>
@@ -415,7 +430,12 @@ export function Home({
           </div>
         </header>
 
-        {articles.length === 0 ? (
+        {isInitialLoading ? (
+          <div className="mt-16 text-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="mt-4 text-slate-500">加载文章中...</p>
+          </div>
+        ) : showEmptyState ? (
           <div className="mt-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-10">
             <p className="text-lg font-semibold text-slate-700">导入你的第一篇文章</p>
             <p className="text-sm text-slate-400 mt-2">支持粘贴、上传 PDF 或 AI 生成</p>

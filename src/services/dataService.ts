@@ -166,6 +166,62 @@ function isMissingTableError(error: unknown): boolean {
   return false;
 }
 
+function buildCountMap(articleIds: string[], rows: Array<{ article_id: string }> | null | undefined): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const articleId of articleIds) {
+    map.set(articleId, 0);
+  }
+  for (const row of rows || []) {
+    map.set(row.article_id, (map.get(row.article_id) || 0) + 1);
+  }
+  return map;
+}
+
+async function getArticleCountMap(table: string, articleIds: string[]): Promise<Map<string, number>> {
+  if (articleIds.length === 0) return new Map();
+  if (missingTables.has(table)) {
+    return buildCountMap(articleIds, []);
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .select('article_id')
+    .in('article_id', articleIds);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add(table);
+      return buildCountMap(articleIds, []);
+    }
+    throw error;
+  }
+  return buildCountMap(articleIds, data || []);
+}
+
+async function getProgressMapForArticles(articleIds: string[]): Promise<Map<string, LearningProgress>> {
+  if (articleIds.length === 0) return new Map();
+  if (missingTables.has('learning_progress')) return new Map();
+
+  const { data, error } = await supabase
+    .from('learning_progress')
+    .select('*')
+    .in('article_id', articleIds);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('learning_progress');
+      return new Map();
+    }
+    throw error;
+  }
+
+  const map = new Map<string, LearningProgress>();
+  for (const row of data || []) {
+    map.set(row.article_id, row);
+  }
+  return map;
+}
+
 async function getArticleTagsForArticles(articleIds: string[]): Promise<Map<string, string[]>> {
   if (articleIds.length === 0) return new Map();
 
@@ -227,51 +283,77 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
   if (!articles) return [];
 
   const articleIds = articles.map(article => article.id);
-  const articleTagsMap = await getArticleTagsForArticles(articleIds);
-  const articlesWithProgress = await Promise.all(
-    articles.map(async (article) => {
-      const { data: progress } = await supabase
-        .from('learning_progress')
-        .select('*')
-        .eq('article_id', article.id)
-        .maybeSingle();
-
-      const [{ count: cardCount }, { count: messageCount }, { count: galgameMessageCount }, { count: quizCount }] = await Promise.all([
-        supabase
-          .from('cards')
-          .select('*', { count: 'exact', head: true })
-          .eq('article_id', article.id),
-        supabase
-          .from('dialogue_messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('article_id', article.id),
-        supabase
-          .from('galgame_messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('article_id', article.id),
-        supabase
-          .from('quiz_questions')
-          .select('*', { count: 'exact', head: true })
-          .eq('article_id', article.id),
-      ]);
-
-      const enriched: ArticleWithProgress = {
-        ...article,
-        tagIds: articleTagsMap.get(article.id) || [],
-        progress: progress || undefined,
-        cardCount: cardCount || 0,
-        messageCount: messageCount || 0,
-        galgameMessageCount: galgameMessageCount || 0,
-        quizCount: quizCount || 0,
-      };
-      cache.articlesById.set(article.id, { data: enriched, ts: Date.now() });
-      setCacheEntry(cache.articleTagsByArticleId, article.id, enriched.tagIds || []);
-      return enriched;
-    })
-  );
+  const [
+    articleTagsMap,
+    progressMap,
+    cardCountMap,
+    messageCountMap,
+    galgameCountMap,
+    quizCountMap,
+  ] = await Promise.all([
+    getArticleTagsForArticles(articleIds),
+    getProgressMapForArticles(articleIds),
+    getArticleCountMap('cards', articleIds),
+    getArticleCountMap('dialogue_messages', articleIds),
+    getArticleCountMap('galgame_messages', articleIds),
+    getArticleCountMap('quiz_questions', articleIds),
+  ]);
+  const articlesWithProgress = articles.map((article) => {
+    const progress = progressMap.get(article.id) || null;
+    const enriched: ArticleWithProgress = {
+      ...article,
+      tagIds: articleTagsMap.get(article.id) || [],
+      progress: progress || undefined,
+      cardCount: cardCountMap.get(article.id) || 0,
+      messageCount: messageCountMap.get(article.id) || 0,
+      galgameMessageCount: galgameCountMap.get(article.id) || 0,
+      quizCount: quizCountMap.get(article.id) || 0,
+    };
+    cache.articlesById.set(article.id, { data: enriched, ts: Date.now() });
+    setCacheEntry(cache.articleTagsByArticleId, article.id, enriched.tagIds || []);
+    setCacheEntry(cache.progressByArticleId, article.id, progress ?? null);
+    return enriched;
+  });
 
   cache.articles = { data: articlesWithProgress, ts: Date.now() };
   return articlesWithProgress;
+}
+
+export async function getArticlesLite(): Promise<ArticleWithProgress[]> {
+  if (!(await isAuthenticated())) {
+    return guestStorage.getArticles();
+  }
+
+  if (isFresh(cache.articles)) {
+    return cache.articles.data;
+  }
+
+  const { data: articles, error } = await supabase
+    .from('articles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  if (!articles) return [];
+
+  const articlesLite = articles.map((article) => {
+    const cachedProgress = cache.progressByArticleId.get(article.id)?.data ?? null;
+    const cachedTags = cache.articleTagsByArticleId.get(article.id)?.data ?? [];
+    const enriched: ArticleWithProgress = {
+      ...article,
+      tagIds: cachedTags,
+      progress: cachedProgress || undefined,
+      cardCount: article.cardCount || 0,
+      messageCount: article.messageCount || 0,
+      galgameMessageCount: article.galgameMessageCount || 0,
+      quizCount: article.quizCount || 0,
+    };
+    cache.articlesById.set(article.id, { data: enriched, ts: Date.now() });
+    return enriched;
+  });
+
+  cache.articles = { data: articlesLite, ts: Date.now() };
+  return articlesLite;
 }
 
 export async function getArticle(id: string): Promise<Article | null> {
