@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Flame, Gem, Plus } from 'lucide-react';
+import { ChevronDown, Flame, Gem, Plus, Tag as TagIcon, X } from 'lucide-react';
 import {
   getArticles,
   getCards,
@@ -64,6 +64,7 @@ export function Home({
   const [totalPoints, setTotalPoints] = useState(0);
   const [isLoading, setIsLoading] = useState(!cachedArticles);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showTagDrawer, setShowTagDrawer] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
@@ -279,6 +280,11 @@ export function Home({
     setShowDropdown(false);
   };
 
+  const handleSelectTag = (tagId: string | null) => {
+    setSelectedTagId(tagId);
+    setShowTagDrawer(false);
+  };
+
   const handleNodeClick = (node: PathNode) => {
     if (!selectedArticleId) return;
     if (node.status === 'locked') return;
@@ -391,6 +397,13 @@ export function Home({
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowTagDrawer(true)}
+              className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm text-slate-700"
+            >
+              <TagIcon className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-semibold">标签筛选</span>
+            </button>
             <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
               <Flame className="w-4 h-4 text-orange-500" />
               <span className="text-sm font-semibold text-slate-700">{streakDays} 天</span>
@@ -401,86 +414,6 @@ export function Home({
             </div>
           </div>
         </header>
-
-        <section className="mt-6 bg-white border border-slate-100 rounded-3xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800">标签筛选</h3>
-              <p className="text-xs text-slate-400 mt-1">支持层级标签，未打标签的文章统一在“未分类”下</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button
-              onClick={() => setSelectedTagId(null)}
-              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                selectedTagId === null
-                  ? 'bg-primary text-white border-primary'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              全部 ({articles.length})
-            </button>
-            <button
-              onClick={() => setSelectedTagId(UNCATEGORIZED_TAG_ID)}
-              className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                selectedTagId === UNCATEGORIZED_TAG_ID
-                  ? 'bg-primary text-white border-primary'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              未分类 ({uncategorizedCount})
-            </button>
-            {(childrenByParent.get(null) || []).map((tag) => (
-              <button
-                key={tag.id}
-                onClick={() => setSelectedTagId(tag.id)}
-                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                  selectedTagId === tag.id
-                    ? 'bg-primary text-white border-primary'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {tag.name} ({tagCounts.get(tag.id) || 0})
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-4 border-t border-slate-100 pt-3">
-            <p className="text-xs text-slate-400">标签目录</p>
-            <div className="mt-2 max-h-64 overflow-auto space-y-1">
-              <button
-                onClick={() => setSelectedTagId(UNCATEGORIZED_TAG_ID)}
-                className={`w-full text-left text-sm px-2 py-1 rounded-lg transition-colors ${
-                  selectedTagId === UNCATEGORIZED_TAG_ID
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                未分类 ({uncategorizedCount})
-              </button>
-              {(childrenByParent.get(null) || []).map((tag) => {
-                const renderNode = (node: Tag, depth: number): JSX.Element => {
-                  const isActive = selectedTagId === node.id;
-                  return (
-                    <div key={node.id}>
-                      <button
-                        onClick={() => setSelectedTagId(node.id)}
-                        className={`w-full text-left text-sm px-2 py-1 rounded-lg transition-colors ${
-                          isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'
-                        }`}
-                        style={{ paddingLeft: 8 + depth * 12 }}
-                      >
-                        {node.name} ({tagCounts.get(node.id) || 0})
-                      </button>
-                      {(childrenByParent.get(node.id) || []).map((child) => renderNode(child, depth + 1))}
-                    </div>
-                  );
-                };
-                return renderNode(tag, 0);
-              })}
-            </div>
-          </div>
-        </section>
 
         {articles.length === 0 ? (
           <div className="mt-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-10">
@@ -550,6 +483,106 @@ export function Home({
       >
         <Plus className="w-6 h-6" />
       </button>
+
+      {showTagDrawer && (
+        <div className="fixed inset-0 z-40">
+          <button
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setShowTagDrawer(false)}
+            aria-label="关闭标签筛选"
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">标签筛选</h3>
+                <p className="text-xs text-slate-400 mt-1">支持层级标签，未打标签的文章统一在“未分类”下</p>
+              </div>
+              <button
+                onClick={() => setShowTagDrawer(false)}
+                className="p-2 rounded-full hover:bg-slate-100 transition-colors"
+                aria-label="关闭"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+              <p className="text-xs text-slate-400">快速筛选</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  onClick={() => handleSelectTag(null)}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    selectedTagId === null
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  全部 ({articles.length})
+                </button>
+                <button
+                  onClick={() => handleSelectTag(UNCATEGORIZED_TAG_ID)}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    selectedTagId === UNCATEGORIZED_TAG_ID
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  未分类 ({uncategorizedCount})
+                </button>
+                {(childrenByParent.get(null) || []).map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => handleSelectTag(tag.id)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                      selectedTagId === tag.id
+                        ? 'bg-primary text-white border-primary'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {tag.name} ({tagCounts.get(tag.id) || 0})
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 border-t border-slate-100 pt-4">
+                <p className="text-xs text-slate-400">标签目录</p>
+                <div className="mt-2 max-h-64 overflow-auto space-y-1">
+                  <button
+                    onClick={() => handleSelectTag(UNCATEGORIZED_TAG_ID)}
+                    className={`w-full text-left text-sm px-2 py-1 rounded-lg transition-colors ${
+                      selectedTagId === UNCATEGORIZED_TAG_ID
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    未分类 ({uncategorizedCount})
+                  </button>
+                  {(childrenByParent.get(null) || []).map((tag) => {
+                    const renderNode = (node: Tag, depth: number): JSX.Element => {
+                      const isActive = selectedTagId === node.id;
+                      return (
+                        <div key={node.id}>
+                          <button
+                            onClick={() => handleSelectTag(node.id)}
+                            className={`w-full text-left text-sm px-2 py-1 rounded-lg transition-colors ${
+                              isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                            style={{ paddingLeft: 8 + depth * 12 }}
+                          >
+                            {node.name} ({tagCounts.get(node.id) || 0})
+                          </button>
+                          {(childrenByParent.get(node.id) || []).map((child) => renderNode(child, depth + 1))}
+                        </div>
+                      );
+                    };
+                    return renderNode(tag, 0);
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

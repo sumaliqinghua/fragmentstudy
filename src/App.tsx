@@ -34,6 +34,7 @@ function AppContent() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [readerEntryTab, setReaderEntryTab] = useState<TabKey>('reader');
+  const [hideTabBar, setHideTabBar] = useState(false);
   const [mountedViews, setMountedViews] = useState({
     home: true,
     create: false,
@@ -82,6 +83,12 @@ function AppContent() {
       readerPlaceholder: prev.readerPlaceholder || (view.tab === 'reader' && (!view.articleId || !view.mode)),
     }));
   }, [view]);
+
+  useEffect(() => {
+    if (view.tab !== 'reader') {
+      setHideTabBar(false);
+    }
+  }, [view.tab]);
 
   const handleBackToHome = () => {
     setView({ tab: 'home' });
@@ -215,6 +222,7 @@ function AppContent() {
             initialMode={readerMode as ReaderMode}
             onBack={() => setView({ tab: 'home' })}
             onStartQuiz={() => setView({ tab: 'reader', articleId: readerArticleId, mode: 'quiz' })}
+            onFullscreenChange={setHideTabBar}
           />
         </div>
       )}
@@ -237,7 +245,7 @@ function AppContent() {
           <ReaderPlaceholder onBack={() => setView({ tab: 'home' })} />
         </div>
       )}
-      <BottomTabBar activeTab={resolvedActiveTab} onChange={handleTabChange} />
+      {!hideTabBar && <BottomTabBar activeTab={resolvedActiveTab} onChange={handleTabChange} />}
       <WelcomeModal
         isOpen={showWelcome}
         onLogin={handleWelcomeLogin}

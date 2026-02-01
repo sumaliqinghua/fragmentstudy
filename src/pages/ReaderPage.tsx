@@ -23,15 +23,17 @@ interface ReaderPageProps {
   initialMode?: ReaderMode;
   onBack: () => void;
   onStartQuiz?: () => void;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
-export function ReaderPage({ articleId, initialMode = 'original', onBack, onStartQuiz }: ReaderPageProps) {
+export function ReaderPage({ articleId, initialMode = 'original', onBack, onStartQuiz, onFullscreenChange }: ReaderPageProps) {
   const [mode, setMode] = useState<ReaderMode>(initialMode);
   const [article, setArticle] = useState<Article | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [progress, setProgress] = useState<LearningProgress | null>(null);
   const [dialogueCount, setDialogueCount] = useState(0);
   const [galgameCount, setGalgameCount] = useState(0);
+  const [isGalgameFullscreen, setIsGalgameFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [readingPercent, setReadingPercent] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -47,6 +49,12 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
+
+  useEffect(() => {
+    if (mode !== 'galgame' || galgameCount === 0) {
+      setIsGalgameFullscreen(false);
+    }
+  }, [mode, galgameCount]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -139,6 +147,12 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
   }, [cards.length, progress]);
   const displayProgress = mode === 'original' ? readingPercent : progressPercent;
 
+  const hideReaderChrome = mode === 'galgame' && galgameCount > 0 && isGalgameFullscreen;
+
+  useEffect(() => {
+    onFullscreenChange?.(hideReaderChrome);
+  }, [hideReaderChrome, onFullscreenChange]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -159,39 +173,41 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
   }
 
   return (
-    <div className="min-h-screen bg-white pb-24">
-      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100">
-        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <button
-            onClick={onBack}
-            className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
-          <div className="flex-1">
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-              <div className="h-full bg-primary rounded-full" style={{ width: `${displayProgress}%` }} />
+    <div className={`min-h-screen bg-white ${hideReaderChrome ? '' : 'pb-24'}`}>
+      {!hideReaderChrome && (
+        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100">
+          <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <button
+              onClick={onBack}
+              className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <div className="flex-1">
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div className="h-full bg-primary rounded-full" style={{ width: `${displayProgress}%` }} />
+              </div>
             </div>
+            <button
+              onClick={() => undefined}
+              className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
+            >
+              <Settings2 className="w-5 h-5 text-slate-600" />
+            </button>
           </div>
-          <button
-            onClick={() => undefined}
-            className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
-          >
-            <Settings2 className="w-5 h-5 text-slate-600" />
-          </button>
-        </div>
-        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 pb-3">
-          <SegmentControl
-            tabs={[
-              { key: 'original', label: '原文' },
-              { key: 'dialogue', label: '群聊' },
-              { key: 'galgame', label: 'Galgame' },
-            ]}
-            activeKey={mode}
-            onChange={(key) => setMode(key as ReaderMode)}
-          />
-        </div>
-      </header>
+          <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 pb-3">
+            <SegmentControl
+              tabs={[
+                { key: 'original', label: '原文' },
+                { key: 'dialogue', label: '群聊' },
+                { key: 'galgame', label: 'Galgame' },
+              ]}
+              activeKey={mode}
+              onChange={(key) => setMode(key as ReaderMode)}
+            />
+          </div>
+        </header>
+      )}
 
       {mode === 'original' && (
         <OriginalReader
@@ -230,7 +246,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
       )}
 
       {mode === 'galgame' && (
-        <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
+        <div className={isGalgameFullscreen ? '' : 'max-w-md md:max-w-3xl lg:max-w-5xl mx-auto'}>
           {galgameCount === 0 ? (
             <div className="px-6 py-16 text-center">
               <p className="text-lg font-semibold text-slate-700">Galgame 内容未生成</p>
@@ -250,9 +266,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
               )}
             </div>
           ) : (
-            <div className="min-h-[70vh]">
-              <GalgameReader article={article} onBack={onBack} embedded />
-            </div>
+            <GalgameReader article={article} onBack={onBack} onFullscreenChange={setIsGalgameFullscreen} />
           )}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, History, X, ChevronDown, Settings2, FileText, Cloud } from 'lucide-react';
+import { ArrowLeft, History, X, ChevronDown, Settings2, FileText, Cloud, Maximize2, Minimize2 } from 'lucide-react';
 import type { Article, GalgameMessage } from '../types';
 import { getGalgameMessages, upsertProgress } from '../services/dataService';
 import { OriginalTextView } from './OriginalTextView';
@@ -10,6 +10,7 @@ interface GalgameReaderProps {
   article: Article;
   onBack: () => void;
   embedded?: boolean;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
 const EMOTION_EMOJIS: Record<string, string> = {
@@ -56,7 +57,7 @@ function getInitials(name: string): string {
   return name.slice(0, 2);
 }
 
-export function GalgameReader({ article, onBack, embedded = false }: GalgameReaderProps) {
+export function GalgameReader({ article, onBack, embedded = false, onFullscreenChange }: GalgameReaderProps) {
   const [messages, setMessages] = useState<GalgameMessage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
@@ -77,9 +78,10 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
   const [cloudImagePickerTarget, setCloudImagePickerTarget] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<'stage' | 'bubble'>('stage');
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-  const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(0.1);
+  const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(0.06);
   const [backgroundMusic, setBackgroundMusic] = useState<string | null>(null);
   const [dialogueBarHeight, setDialogueBarHeight] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(!embedded);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dialogueBarRef = useRef<HTMLDivElement>(null);
@@ -97,6 +99,25 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
   useEffect(() => {
     loadMessages();
   }, [article.id]);
+
+  useEffect(() => {
+    if (embedded) return;
+    setIsFullscreen(true);
+  }, [embedded]);
+
+  useEffect(() => {
+    if (embedded) return;
+    onFullscreenChange?.(isFullscreen);
+  }, [embedded, isFullscreen, onFullscreenChange]);
+
+  useEffect(() => {
+    if (embedded) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = isFullscreen ? 'hidden' : originalOverflow;
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [embedded, isFullscreen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -514,7 +535,7 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
   const rightCharacter = currentMessage.position === 'right' ? currentMessage : null;
   const characterNames = Array.from(new Set(messages.map(msg => msg.character_name)));
   const portraitHeight = Math.round(portraitWidth * 1.45);
-  const portraitAreaPadding = Math.max(160, dialogueBarHeight + 15);
+  const portraitAreaPadding = Math.min(Math.max(220, dialogueBarHeight + 40), 360);
   const isBubbleMode = displayMode === 'bubble';
   const bubbleSide = currentMessage.position === 'right'
     ? 'right'
@@ -524,10 +545,16 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
         ? 'left'
         : 'right';
 
+  const containerClass = embedded
+    ? 'relative flex-1 min-h-[520px]'
+    : isFullscreen
+      ? 'fixed inset-0 z-[60]'
+      : 'relative min-h-screen';
+
   return (
     <div
       ref={containerRef}
-      className={`${embedded ? 'flex-1 min-h-[520px]' : 'h-screen'} bg-gray-900 flex flex-col relative overflow-hidden ${getScreenEffectClass()}`}
+      className={`${containerClass} bg-gray-900 flex flex-col overflow-hidden ${getScreenEffectClass()}`}
       onClick={handleClick}
     >
       <div className="absolute inset-0 pointer-events-none">
@@ -536,10 +563,17 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${backgroundImage})` }}
           />
-        ) : null}
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(180deg, #e0f2fe 0%, #f0fdf4 45%, #ffffff 100%)',
+            }}
+          />
+        )}
         <div
           className="absolute inset-0"
-          style={{ backgroundColor: `rgba(0, 0, 0, ${backgroundOverlayOpacity})` }}
+          style={{ backgroundColor: `rgba(15, 23, 42, ${backgroundOverlayOpacity})` }}
         />
       </div>
       <style>{`
@@ -587,6 +621,16 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
             <p className="text-xs text-gray-400">{currentIndex + 1} / {messages.length}</p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5 text-white" />
+              ) : (
+                <Maximize2 className="w-5 h-5 text-white" />
+              )}
+            </button>
             <button
               onClick={() => setShowOriginalText(true)}
               className="p-2 hover:bg-white/10 rounded-full transition-colors"
@@ -890,56 +934,56 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
       {!isBubbleMode && (
         <div
           ref={dialogueBarRef}
-          className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-black/80 backdrop-blur-sm"
+          className="absolute bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]"
           onClick={e => e.stopPropagation()}
         >
-          <div className="max-w-4xl mx-auto px-4 py-6">
-            <div className="flex items-center gap-3 mb-3">
+          <div className="max-w-4xl mx-auto px-4 py-5">
+            <div className="flex items-center gap-3 mb-2">
               <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${avatarColor} flex items-center justify-center text-white text-sm font-bold`}>
                 {getInitials(currentMessage.character_name)}
               </div>
-              <span className="text-teal-400 font-medium">{currentMessage.character_name}</span>
+              <span className="text-emerald-600 font-semibold">{currentMessage.character_name}</span>
               {currentMessage.knowledge_point && (
-                <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">
+                <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
                   {currentMessage.knowledge_point}
                 </span>
               )}
             </div>
 
-            <div className="min-h-[80px] flex items-start">
-              <p className="text-white text-lg leading-relaxed">
+            <div className="min-h-[64px] flex items-start">
+              <p className="text-slate-900 text-lg leading-relaxed">
                 {displayedText}
-                {isTyping && <span className="inline-block w-0.5 h-5 bg-white ml-1 animate-blink" />}
+                {isTyping && <span className="inline-block w-0.5 h-5 bg-slate-900 ml-1 animate-blink" />}
               </p>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800">
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200">
               <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                 <button
                   onClick={handlePrevious}
                   disabled={currentIndex === 0}
-                  className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   上一句
                 </button>
                 <button
                   onClick={handleNext}
                   disabled={currentIndex === messages.length - 1}
-                  className="px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   下一句
                 </button>
               </div>
 
               {!isTyping && currentIndex < messages.length - 1 && (
-                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                <div className="flex items-center gap-2 text-slate-400 text-sm">
                   <span>点击继续</span>
                   <ChevronDown className="w-4 h-4 animate-bounce" />
                 </div>
               )}
 
               {currentIndex === messages.length - 1 && !isTyping && (
-                <span className="text-teal-400 text-sm">已到结尾</span>
+                <span className="text-emerald-600 text-sm">已到结尾</span>
               )}
             </div>
           </div>
@@ -949,21 +993,21 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
       {isBubbleMode && (
         <div
           ref={dialogueBarRef}
-          className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-2 flex items-center justify-between text-xs text-gray-400"
+          className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-5 pt-3 flex items-center justify-between text-xs text-slate-500 bg-white/90 border-t border-slate-200"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex gap-2">
             <button
               onClick={handlePrevious}
               disabled={currentIndex === 0}
-              className="px-3 py-1.5 rounded-full border border-white/10 hover:border-white/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               上一句
             </button>
             <button
               onClick={handleNext}
               disabled={currentIndex === messages.length - 1}
-              className="px-3 py-1.5 rounded-full border border-white/10 hover:border-white/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               下一句
             </button>
@@ -975,7 +1019,7 @@ export function GalgameReader({ article, onBack, embedded = false }: GalgameRead
             </div>
           )}
           {currentIndex === messages.length - 1 && !isTyping && (
-            <span className="text-teal-300">已到结尾</span>
+            <span className="text-emerald-600">已到结尾</span>
           )}
         </div>
       )}
