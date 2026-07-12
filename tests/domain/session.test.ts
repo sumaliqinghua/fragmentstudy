@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSession, endSession, resumeSession } from '../../src/domain/session.ts';
+import { createSession, endSession, pauseSession, resumeSession } from '../../src/domain/session.ts';
+
+const plan = {
+  projectId: 'project-a',
+  projectMaterialId: 'material-a',
+  fragmentIds: ['item-1', 'item-2', 'item-3'],
+};
 
 test('resume preserves the project and mode chosen when a session starts', () => {
   const session = createSession({
@@ -52,4 +58,14 @@ test('an ended session cannot be ended twice', () => {
   const session = createSession({ id: 'session-1', mode: 'card', plan: { projectId: 'project-a', projectMaterialId: 'material-a', fragmentIds: ['item-1'] }, now: '2026-07-13T00:00:00.000Z' });
   const ended = endSession(session, { reason: 'completed', now: '2026-07-13T00:01:00.000Z' });
   assert.throws(() => endSession(ended, { reason: 'completed', now: '2026-07-13T00:02:00.000Z' }), /already ended/i);
+});
+
+test('pausing keeps the current cursor available for a later return', () => {
+  const session = createSession({ id: 'session', mode: 'card', plan, now: '2026-07-13T00:00:00Z' });
+  const active = resumeSession(session, { cursor: 2, now: '2026-07-13T00:01:00Z' });
+  const paused = pauseSession(active, { now: '2026-07-13T00:02:00Z' });
+
+  assert.equal(paused.status, 'paused');
+  assert.equal(paused.cursor, 2);
+  assert.equal(resumeSession(paused, { cursor: paused.cursor, now: '2026-07-14T00:00:00Z' }).cursor, 2);
 });

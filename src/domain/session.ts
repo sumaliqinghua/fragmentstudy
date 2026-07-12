@@ -1,7 +1,7 @@
 import type { SessionPlan } from './sessionPlan.ts';
 
 export type LearningMode = 'card' | 'dialogue' | 'galgame';
-export type SessionStatus = 'ready' | 'active' | 'ended';
+export type SessionStatus = 'ready' | 'active' | 'paused' | 'ended';
 export type SessionEndReason = 'completed' | 'enough_for_today' | 'switch_mode';
 
 export interface LearningSession {
@@ -79,6 +79,20 @@ export function endSession(
     ...session,
     status: 'ended',
     endReason: input.reason,
+    updatedAt: input.now,
+  });
+}
+
+export function pauseSession(
+  session: LearningSession,
+  input: { now: string },
+): LearningSession {
+  if (session.status === 'ended') {
+    throw new Error('Cannot pause an ended session');
+  }
+  return freezeSession({
+    ...session,
+    status: 'paused',
     updatedAt: input.now,
   });
 }
