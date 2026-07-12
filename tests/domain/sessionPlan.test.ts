@@ -15,6 +15,8 @@ test('default session planning never mixes project materials', () => {
   });
 
   assert.deepEqual(plan.fragmentIds, ['a-1', 'a-2']);
+  assert.equal(Object.isFrozen(plan), true);
+  assert.equal(Object.isFrozen(plan.fragmentIds), true);
 });
 
 test('a session plan rejects duplicate eligible fragments', () => {

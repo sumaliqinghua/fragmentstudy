@@ -13,9 +13,9 @@ interface CreateSessionPlanInput {
 }
 
 export interface SessionPlan {
-  projectId: string;
-  projectMaterialId: string;
-  fragmentIds: string[];
+  readonly projectId: string;
+  readonly projectMaterialId: string;
+  readonly fragmentIds: readonly string[];
 }
 
 export function createSessionPlan(input: CreateSessionPlanInput): SessionPlan {
@@ -42,9 +42,9 @@ export function createSessionPlan(input: CreateSessionPlanInput): SessionPlan {
     .slice(0, input.limit)
     .map((fragment) => fragment.id);
 
-  return {
+  return Object.freeze({
     projectId: input.projectId,
     projectMaterialId: input.projectMaterialId,
-    fragmentIds,
-  };
+    fragmentIds: Object.freeze(fragmentIds),
+  });
 }

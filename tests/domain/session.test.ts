@@ -47,3 +47,9 @@ test('a user can end anywhere and an ended session cannot be resumed', () => {
     /ended session/i,
   );
 });
+
+test('an ended session cannot be ended twice', () => {
+  const session = createSession({ id: 'session-1', mode: 'card', plan: { projectId: 'project-a', projectMaterialId: 'material-a', fragmentIds: ['item-1'] }, now: '2026-07-13T00:00:00.000Z' });
+  const ended = endSession(session, { reason: 'completed', now: '2026-07-13T00:01:00.000Z' });
+  assert.throws(() => endSession(ended, { reason: 'completed', now: '2026-07-13T00:02:00.000Z' }), /already ended/i);
+});

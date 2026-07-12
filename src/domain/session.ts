@@ -72,6 +72,9 @@ export function endSession(
   session: LearningSession,
   input: { reason: SessionEndReason; now: string },
 ): LearningSession {
+  if (session.status === 'ended') {
+    throw new Error('Session is already ended');
+  }
   return freezeSession({
     ...session,
     status: 'ended',
