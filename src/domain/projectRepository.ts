@@ -13,7 +13,7 @@ export interface ProjectRepository {
   deleteProject(projectId: string): Promise<void>;
   addMaterial(input: { projectId: string; title: string; sourceType: MaterialSourceType; content: string; sourceUrl?: string }): Promise<ProjectMaterial>;
   listProjectMaterials(projectId: string): Promise<readonly ProjectMaterial[]>;
-  saveFragment(input: Omit<Fragment, 'id'>): Promise<Fragment>;
+  saveFragment(input: Omit<Fragment, 'id'> & { projectId: string }): Promise<Fragment>;
   listFragments(projectId: string, projectMaterialId: string): Promise<readonly Fragment[]>;
   saveGenerationJob(input: Omit<GenerationJob, 'id' | 'createdAt' | 'updatedAt'>): Promise<GenerationJob>;
   listGenerationJobs(projectId: string): Promise<readonly GenerationJob[]>;
@@ -55,8 +55,19 @@ export function createGuestProjectRepository(store: KeyValueStore): ProjectRepos
     },
     async listProjectMaterials(projectId) { return (await store.entries<ProjectMaterial>(keys.link)).map(([, value]) => value).filter(value => value.projectId === projectId); },
     async saveFragment(input) {
-      if (!await store.get<ProjectMaterial>(keys.link + input.projectMaterialId)) throw new Error('Project material not found');
-      const fragment = Object.freeze({ id: id(), ...input });
+      const link = await store.get<ProjectMaterial>(keys.link + input.projectMaterialId);
+      if (!link) throw new Error('Project material not found');
+      if (link.projectId !== input.projectId) throw new Error('Project material does not belong to project');
+      const fragment = Object.freeze({
+        id: id(),
+        projectMaterialId: input.projectMaterialId,
+        sectionId: input.sectionId,
+        order: input.order,
+        content: input.content,
+        sourceText: input.sourceText,
+        sourceStart: input.sourceStart,
+        sourceEnd: input.sourceEnd,
+      });
       await store.set(keys.fragment + fragment.id, fragment);
       return fragment;
     },
@@ -67,6 +78,10 @@ export function createGuestProjectRepository(store: KeyValueStore): ProjectRepos
     },
     async saveGenerationJob(input) {
       if (!await store.get<Project>(keys.project + input.projectId)) throw new Error('Project not found');
+      if (input.projectMaterialId) {
+        const link = await store.get<ProjectMaterial>(keys.link + input.projectMaterialId);
+        if (link?.projectId !== input.projectId) throw new Error('Project material does not belong to project');
+      }
       const existing = (await this.listGenerationJobs(input.projectId)).find(job => job.idempotencyKey === input.idempotencyKey);
       if (existing) return existing;
       const timestamp = now();
