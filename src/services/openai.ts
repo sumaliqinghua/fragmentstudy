@@ -26,14 +26,20 @@ function getProxyUrl(): string {
 }
 
 export function getOpenAIConfig(): OpenAIConfig {
+  const envApiKey = import.meta.env.VITE_QINIU_API_KEY || import.meta.env.QINIU_API_KEY || '';
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
-    return JSON.parse(stored);
+    const config = JSON.parse(stored) as Partial<OpenAIConfig>;
+    return {
+      apiKey: config.apiKey || envApiKey,
+      apiEndpoint: config.apiEndpoint || 'https://api.qnaigc.com/v1',
+      model: config.model || 'qwen/qwen3.7-plus',
+    };
   }
   return {
-    apiKey: '',
+    apiKey: envApiKey,
     apiEndpoint: 'https://api.qnaigc.com/v1',
-    model: 'minimax/minimax-m2.1',
+    model: 'qwen/qwen3.7-plus',
   };
 }
 

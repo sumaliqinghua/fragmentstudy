@@ -13,13 +13,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [model, setModel] = useState('');
   const [saved, setSaved] = useState(false);
   const modelOptions = [
-    'qwen3-max',
-    'deepseek/deepseek-v3.2-251201',
-    'doubao-seed-1.6-thinking',
-    'doubao-seed-1.6',
-    'minimax/minimax-m2.1',
-    'moonshotai/kimi-k2-thinking',
-    'z-ai/glm-4.6',
+    'openai/gpt-5.6-sol',
+    'openai/gpt-5.6-luna',
+    'bytedance/doubao-seed-2-1-pro',
+    'bytedance/doubao-seed-2-1-turbo',
+    'qwen/qwen3.7-plus',
+    'qwen/qwen3.7-max',
+    'z-ai/glm-5.2',
+    'minimax/minimax-m3',
+    'deepseek/deepseek-v4-pro',
+    'deepseek/deepseek-v4-flash',
+    'moonshotai/kimi-k2.7-code',
   ];
   const availableModels =
     model && !modelOptions.includes(model) ? [model, ...modelOptions] : modelOptions;
