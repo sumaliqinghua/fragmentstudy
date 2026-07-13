@@ -68,11 +68,13 @@ export function importTextProject(workspace: LearningWorkspace, input: ImportTex
 
 export function startWorkspaceSession(
   workspace: LearningWorkspace,
-  input: { projectId: string; mode?: LearningMode; now: string; createId?: () => string },
+  input: { projectId: string; mode?: LearningMode; fragmentId?: string; now: string; createId?: () => string },
 ): LearningWorkspace {
   const mode = input.mode ?? 'card';
-  const activeSession = workspace.sessions.find((candidate) => candidate.projectId === input.projectId && candidate.status === 'active');
-  if (activeSession && activeSession.mode !== mode) throw new Error('Pause the current session before switching modes');
+  const activeSession = workspace.sessions.find((candidate) => candidate.status === 'active');
+  if (activeSession && (activeSession.projectId !== input.projectId || activeSession.mode !== mode)) {
+    throw new Error('Pause the current session before switching projects or modes');
+  }
   let session = findSession(workspace, input.projectId, mode, false);
   if (!session) {
     const project = workspace.projects.find((candidate) => candidate.project.id === input.projectId);
@@ -88,7 +90,9 @@ export function startWorkspaceSession(
     session = createSession({ id: input.createId?.() ?? crypto.randomUUID(), mode, plan, now: input.now });
     workspace = { ...workspace, sessions: [...workspace.sessions, session] };
   }
-  const resumed = resumeSession(session, { cursor: session.cursor, now: input.now });
+  const requestedCursor = input.fragmentId ? session.itemIds.indexOf(input.fragmentId) : session.cursor;
+  if (input.fragmentId && requestedCursor < 0) throw new Error('Fragment does not belong to session');
+  const resumed = resumeSession(session, { cursor: requestedCursor, now: input.now });
   return replaceSession(workspace, resumed, input.projectId, mode);
 }
 

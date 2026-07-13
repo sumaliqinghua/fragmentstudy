@@ -16,6 +16,13 @@ test('persisted sessions retain their immutable learning boundary and cursor', (
   }
 });
 
+test('session mode and lifecycle values match the domain contract', () => {
+  const sessions = migration.match(/CREATE TABLE sessions \(([^;]+)\);/)?.[1] ?? '';
+  assert.match(sessions, /mode text NOT NULL CHECK \(mode IN \('card','dialogue','galgame'\)\)/);
+  assert.match(sessions, /status text NOT NULL CHECK \(status IN \('ready','active','paused','ended'\)\)/);
+  assert.match(sessions, /end_reason text CHECK \(end_reason IN \('completed','enough_for_today','switch_mode'\)\)/);
+});
+
 test('experience items enforce project consistency through their fragments', () => {
   const branch = migration.match(/WHEN 'experience_items' THEN ([^;]+);/)?.[1] ?? '';
   assert.match(branch, /project_materials/);

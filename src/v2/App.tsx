@@ -44,8 +44,8 @@ export default function App() {
     setContent('');
   };
 
-  const begin = (projectId: string, mode: LearningMode = 'card') => {
-    setWorkspace((current) => startWorkspaceSession(current, { projectId, mode, now: new Date().toISOString(), createId: () => crypto.randomUUID() }));
+  const begin = (projectId: string, mode: LearningMode = 'card', fragmentId?: string) => {
+    setWorkspace((current) => startWorkspaceSession(current, { projectId, mode, fragmentId, now: new Date().toISOString(), createId: () => crypto.randomUUID() }));
     setScreen('session');
   };
 
@@ -123,7 +123,7 @@ function ImportScreen(props: { title: string; content: string; hasProjects: bool
   </section>;
 }
 
-function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspace; onAdd: () => void; onBegin: (projectId: string, mode?: LearningMode) => void }) {
+function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspace; onAdd: () => void; onBegin: (projectId: string, mode?: LearningMode, fragmentId?: string) => void }) {
   return <section className="v2-page">
     <header className="v2-topbar"><Brand /><button className="v2-icon-button" onClick={onAdd} aria-label="添加项目"><Plus /></button></header>
     <div className="v2-home-title"><p className="v2-kicker">今天想靠近什么？</p><h1>随便学一点，<br /><em>就很好。</em></h1></div>
@@ -137,7 +137,7 @@ function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspac
           <h2>{item.project.title}</h2>
           <p>{item.materials[0].content}</p>
           <div className="v2-card-foot"><div><Layers3 size={16} /><span>{modeLabel(session.mode)} · 接触过 {session.cursor + (session.status === 'ready' ? 0 : 1)} 个片段</span></div><button onClick={() => onBegin(item.project.id, session.mode)}>{session.status === 'ready' ? '开始学一点' : '继续学一点'}<ChevronRight size={18} /></button></div>
-          <details className="v2-project-map"><summary><span><Map size={15} />看看这片内容</span><ChevronDown size={15} /></summary><div className="v2-map-path">{map.map((node, nodeIndex) => <button className={`v2-map-node ${node.relationship}`} key={node.id} onClick={() => onBegin(item.project.id, 'card')}><i>{String(nodeIndex + 1).padStart(2, '0')}</i><span><strong>{node.label}</strong><small>{node.hint}</small></span></button>)}</div><p>这不是关卡路线，任何一处都可以先看看。</p></details>
+          <details className="v2-project-map"><summary><span><Map size={15} />看看这片内容</span><ChevronDown size={15} /></summary><div className="v2-map-path">{map.map((node, nodeIndex) => <button className={`v2-map-node ${node.relationship}`} key={node.id} onClick={() => onBegin(item.project.id, 'card', node.id)}><i>{String(nodeIndex + 1).padStart(2, '0')}</i><span><strong>{node.label}</strong><small>{node.hint}</small></span></button>)}</div><p>这不是关卡路线，任何一处都可以先看看。</p></details>
         </article>;
       })}
     </div>

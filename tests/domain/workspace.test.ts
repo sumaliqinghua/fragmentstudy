@@ -73,3 +73,26 @@ test('modes share fragments but keep independent narrative cursors', () => {
   assert.equal(galgame?.cursor, 0);
   assert.deepEqual(galgame?.itemIds, dialogue?.itemIds);
 });
+
+test('starting another project requires pausing the current session first', () => {
+  let workspace = importTextProject(createWorkspace(), { title: 'A', content: '项目一的第一点足够长。项目一的第二点也足够长。', now: '2026-07-13T00:00:00Z', createId: ids });
+  workspace = importTextProject(workspace, { title: 'B', content: '项目二的第一点足够长。项目二的第二点也足够长。', now: '2026-07-13T00:01:00Z', createId: ids });
+  const [projectA, projectB] = workspace.projects;
+  workspace = startWorkspaceSession(workspace, { projectId: projectA.project.id, now: '2026-07-13T00:02:00Z' });
+
+  assert.throws(
+    () => startWorkspaceSession(workspace, { projectId: projectB.project.id, now: '2026-07-13T00:03:00Z' }),
+    /pause the current session/i,
+  );
+});
+
+test('a map entry can start the card session at its chosen fragment', () => {
+  let workspace = importTextProject(createWorkspace(), { title: 'A', content: '第一处内容足够形成片段。第二处内容也足够形成片段。第三处内容仍足够形成片段。', now: '2026-07-13T00:00:00Z', createId: ids });
+  const project = workspace.projects[0];
+  const chosen = project.fragments[2];
+
+  workspace = startWorkspaceSession(workspace, { projectId: project.project.id, mode: 'card', fragmentId: chosen.id, now: '2026-07-13T00:01:00Z' });
+
+  const session = workspace.sessions.find((candidate) => candidate.projectId === project.project.id && candidate.mode === 'card');
+  assert.equal(session?.itemIds[session.cursor], chosen.id);
+});

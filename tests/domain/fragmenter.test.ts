@@ -18,3 +18,12 @@ test('fragmenter rejects blank material and invalid target sizes', () => {
   assert.throws(() => fragmentMaterial({ projectMaterialId: 'material', content: '  ', targetLength: 18 }), /content/);
   assert.throws(() => fragmentMaterial({ projectMaterialId: 'material', content: '内容', targetLength: 0 }), /target length/);
 });
+
+test('fragmenter still breaks up long text without punctuation', () => {
+  const source = '这是一段完全没有标点但是明显长于目标长度的材料所以仍然需要被拆成可以轻松阅读的小片段';
+  const fragments = fragmentMaterial({ projectMaterialId: 'material', content: source, targetLength: 12 });
+
+  assert.ok(fragments.length > 1);
+  assert.ok(fragments.every((fragment) => fragment.content.length <= 12));
+  assert.equal(fragments.map((fragment) => fragment.sourceText).join(''), source);
+});

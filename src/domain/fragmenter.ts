@@ -27,6 +27,19 @@ export function fragmentMaterial(input: FragmentMaterialInput): readonly Fragmen
     const end = (match.index ?? 0) + raw.length - trailing;
     const text = input.content.slice(start, end);
 
+    if (text.length > input.targetLength) {
+      if (pending) {
+        chunks.push(pending);
+        pending = undefined;
+      }
+      for (let offset = 0; offset < text.length; offset += input.targetLength) {
+        const pieceStart = start + offset;
+        const pieceEnd = Math.min(end, pieceStart + input.targetLength);
+        chunks.push({ text: input.content.slice(pieceStart, pieceEnd), start: pieceStart, end: pieceEnd });
+      }
+      continue;
+    }
+
     if (pending && pending.text.length + text.length <= input.targetLength) {
       pending = { text: input.content.slice(pending.start, end), start: pending.start, end };
     } else {
