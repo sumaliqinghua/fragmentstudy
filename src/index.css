@@ -141,6 +141,23 @@ button { -webkit-tap-highlight-color: transparent; }
 .v2-card-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .v2-card-foot div { color: var(--muted); font-size: 11px; }
 .v2-card-foot button { background: var(--coral); color: white; border: 0; border-radius: 14px 3px 14px 3px; padding: 11px 13px; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; }
+.v2-project-map { border-top: 1px solid var(--line); margin-top: 17px; padding-top: 4px; }
+.v2-project-map summary { list-style: none; cursor: pointer; padding: 13px 0 5px; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; font-weight: 700; }
+.v2-project-map summary::-webkit-details-marker { display: none; }
+.v2-project-map summary span { display: flex; align-items: center; gap: 7px; }
+.v2-project-map[open] summary > svg { transform: rotate(180deg); }
+.v2-map-path { margin-top: 13px; position: relative; display: grid; gap: 9px; }
+.v2-map-path::before { content: ''; position: absolute; left: 16px; top: 18px; bottom: 18px; border-left: 1px dashed rgba(40,43,39,.2); }
+.v2-map-node { position: relative; z-index: 1; border: 0; background: transparent; padding: 0; display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; text-align: left; color: var(--ink); }
+.v2-map-node > i { width: 34px; height: 34px; border-radius: 50%; background: var(--paper-deep); border: 1px solid rgba(40,43,39,.1); display: grid; place-items: center; font-style: normal; font-size: 8px; letter-spacing: .08em; }
+.v2-map-node.familiar > i { background: var(--mint); color: white; }
+.v2-map-node.revisit > i { background: var(--coral); color: white; }
+.v2-map-node > span { display: block; padding: 9px 11px; border-radius: 3px 12px 3px 12px; transition: background .2s; }
+.v2-map-node:hover > span { background: rgba(255,255,255,.48); }
+.v2-map-node strong, .v2-map-node small { display: block; }
+.v2-map-node strong { font-family: Georgia, serif; font-size: 13px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.v2-map-node small { color: var(--muted); margin-top: 3px; font-size: 9px; }
+.v2-project-map > p { color: var(--muted); font-size: 9px; margin: 12px 0 4px 44px; }
 .v2-add-card { width: 100%; border: 1px dashed rgba(40,43,39,.25); background: transparent; border-radius: 4px 18px 4px 18px; min-height: 52px; margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .v2-coming { display: flex; align-items: flex-start; gap: 10px; font-size: 11px; line-height: 1.6; color: var(--muted); margin: auto 8px 0; padding-top: 32px; }
 .v2-coming svg { flex: 0 0 auto; color: var(--coral); }

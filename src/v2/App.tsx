@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Feather, Gamepad2, Layers3, MessageCircleMore, Plus, Sparkles, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Clock3, Feather, Gamepad2, Layers3, Map, MessageCircleMore, Plus, Sparkles, Users, X } from 'lucide-react';
 import {
   advanceWorkspaceSession,
   importTextProject,
@@ -8,6 +8,7 @@ import {
   type LearningWorkspace,
 } from '../domain/workspace.ts';
 import { createDialogueBeat, createGalgameBeat } from '../domain/narrative.ts';
+import { createProjectMap } from '../domain/projectMap.ts';
 import type { LearningMode } from '../domain/session.ts';
 import { decodeWorkspace, encodeWorkspace, WORKSPACE_STORAGE_KEY } from '../domain/workspaceStorage.ts';
 
@@ -130,11 +131,13 @@ function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspac
       {workspace.projects.map((item, index) => {
         const session = workspace.sessions.find((candidate) => candidate.projectId === item.project.id && candidate.mode === (workspace.activeProjectId === item.project.id ? workspace.activeMode : 'card'))
           ?? workspace.sessions.find((candidate) => candidate.projectId === item.project.id && candidate.mode === 'card')!;
+        const map = createProjectMap({ fragments: item.fragments, exposures: workspace.exposures.filter((exposure) => exposure.projectId === item.project.id) });
         return <article className="v2-project-card" key={item.project.id} style={{ '--delay': `${index * 70}ms` } as React.CSSProperties}>
           <div className="v2-card-label"><span>{session.status === 'ready' ? '还没开始' : '可以续上'}</span><span><Clock3 size={13} />约 2 分钟</span></div>
           <h2>{item.project.title}</h2>
           <p>{item.materials[0].content}</p>
           <div className="v2-card-foot"><div><Layers3 size={16} /><span>{modeLabel(session.mode)} · 接触过 {session.cursor + (session.status === 'ready' ? 0 : 1)} 个片段</span></div><button onClick={() => onBegin(item.project.id, session.mode)}>{session.status === 'ready' ? '开始学一点' : '继续学一点'}<ChevronRight size={18} /></button></div>
+          <details className="v2-project-map"><summary><span><Map size={15} />看看这片内容</span><ChevronDown size={15} /></summary><div className="v2-map-path">{map.map((node, nodeIndex) => <button className={`v2-map-node ${node.relationship}`} key={node.id} onClick={() => onBegin(item.project.id, 'card')}><i>{String(nodeIndex + 1).padStart(2, '0')}</i><span><strong>{node.label}</strong><small>{node.hint}</small></span></button>)}</div><p>这不是关卡路线，任何一处都可以先看看。</p></details>
         </article>;
       })}
     </div>
