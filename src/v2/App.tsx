@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Feather, Layers3, MessageCircleMore, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Feather, Gamepad2, Layers3, MessageCircleMore, Plus, Sparkles, Users, X } from 'lucide-react';
 import {
   advanceWorkspaceSession,
   importTextProject,
@@ -7,6 +7,8 @@ import {
   startWorkspaceSession,
   type LearningWorkspace,
 } from '../domain/workspace.ts';
+import { createDialogueBeat, createGalgameBeat } from '../domain/narrative.ts';
+import type { LearningMode } from '../domain/session.ts';
 import { decodeWorkspace, encodeWorkspace, WORKSPACE_STORAGE_KEY } from '../domain/workspaceStorage.ts';
 
 type Screen = 'home' | 'import' | 'session' | 'paused';
@@ -25,7 +27,8 @@ export default function App() {
     () => workspace.projects.find((item) => item.project.id === workspace.activeProjectId) ?? workspace.projects[workspace.projects.length - 1],
     [workspace],
   );
-  const activeSession = workspace.sessions.find((session) => session.projectId === activeProject?.project.id);
+  const activeSession = workspace.sessions.find((session) => session.projectId === activeProject?.project.id && session.mode === (workspace.activeMode ?? 'card'))
+    ?? workspace.sessions.find((session) => session.projectId === activeProject?.project.id && session.mode === 'card');
   const activeFragment = activeProject?.fragments.find((fragment) => fragment.id === activeSession?.itemIds[activeSession.cursor]);
 
   const importProject = () => {
@@ -40,24 +43,24 @@ export default function App() {
     setContent('');
   };
 
-  const begin = (projectId: string) => {
-    setWorkspace((current) => startWorkspaceSession(current, { projectId, now: new Date().toISOString() }));
+  const begin = (projectId: string, mode: LearningMode = 'card') => {
+    setWorkspace((current) => startWorkspaceSession(current, { projectId, mode, now: new Date().toISOString(), createId: () => crypto.randomUUID() }));
     setScreen('session');
   };
 
   const advance = (kind: 'seen' | 'later' = 'seen') => {
     if (!activeProject || !activeSession) return;
     if (activeSession.cursor === activeSession.itemIds.length - 1) {
-      setWorkspace((current) => pauseWorkspaceSession(current, { projectId: activeProject.project.id, now: new Date().toISOString() }));
+      setWorkspace((current) => pauseWorkspaceSession(current, { projectId: activeProject.project.id, mode: activeSession.mode, now: new Date().toISOString() }));
       setScreen('paused');
       return;
     }
-    setWorkspace((current) => advanceWorkspaceSession(current, { projectId: activeProject.project.id, kind, now: new Date().toISOString() }));
+    setWorkspace((current) => advanceWorkspaceSession(current, { projectId: activeProject.project.id, mode: activeSession.mode, kind, now: new Date().toISOString() }));
   };
 
   const pause = () => {
     if (!activeProject) return;
-    setWorkspace((current) => pauseWorkspaceSession(current, { projectId: activeProject.project.id, now: new Date().toISOString() }));
+    setWorkspace((current) => pauseWorkspaceSession(current, { projectId: activeProject.project.id, mode: activeSession?.mode, now: new Date().toISOString() }));
     setScreen('paused');
   };
 
@@ -83,6 +86,7 @@ export default function App() {
       )}
       {screen === 'session' && activeProject && activeSession && activeFragment && (
         <SessionScreen
+          mode={activeSession.mode}
           title={activeProject.project.title}
           content={activeFragment.content}
           source={activeFragment.sourceText}
@@ -94,7 +98,7 @@ export default function App() {
         />
       )}
       {screen === 'paused' && activeProject && activeSession && (
-        <PausedScreen title={activeProject.project.title} touched={activeSession.cursor + 1} onHome={() => setScreen('home')} onContinue={() => begin(activeProject.project.id)} />
+        <PausedScreen title={activeProject.project.title} mode={activeSession.mode} touched={activeSession.cursor + 1} onHome={() => setScreen('home')} onContinue={() => begin(activeProject.project.id, activeSession.mode)} onChooseMode={(mode) => begin(activeProject.project.id, mode)} />
       )}
     </main>
   );
@@ -118,18 +122,19 @@ function ImportScreen(props: { title: string; content: string; hasProjects: bool
   </section>;
 }
 
-function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspace; onAdd: () => void; onBegin: (projectId: string) => void }) {
+function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspace; onAdd: () => void; onBegin: (projectId: string, mode?: LearningMode) => void }) {
   return <section className="v2-page">
     <header className="v2-topbar"><Brand /><button className="v2-icon-button" onClick={onAdd} aria-label="添加项目"><Plus /></button></header>
     <div className="v2-home-title"><p className="v2-kicker">今天想靠近什么？</p><h1>随便学一点，<br /><em>就很好。</em></h1></div>
     <div className="v2-project-list">
       {workspace.projects.map((item, index) => {
-        const session = workspace.sessions.find((candidate) => candidate.projectId === item.project.id)!;
+        const session = workspace.sessions.find((candidate) => candidate.projectId === item.project.id && candidate.mode === (workspace.activeProjectId === item.project.id ? workspace.activeMode : 'card'))
+          ?? workspace.sessions.find((candidate) => candidate.projectId === item.project.id && candidate.mode === 'card')!;
         return <article className="v2-project-card" key={item.project.id} style={{ '--delay': `${index * 70}ms` } as React.CSSProperties}>
           <div className="v2-card-label"><span>{session.status === 'ready' ? '还没开始' : '可以续上'}</span><span><Clock3 size={13} />约 2 分钟</span></div>
           <h2>{item.project.title}</h2>
           <p>{item.materials[0].content}</p>
-          <div className="v2-card-foot"><div><Layers3 size={16} /><span>接触过 {session.cursor + (session.status === 'ready' ? 0 : 1)} 个片段</span></div><button onClick={() => onBegin(item.project.id)}>{session.status === 'ready' ? '开始学一点' : '继续学一点'}<ChevronRight size={18} /></button></div>
+          <div className="v2-card-foot"><div><Layers3 size={16} /><span>{modeLabel(session.mode)} · 接触过 {session.cursor + (session.status === 'ready' ? 0 : 1)} 个片段</span></div><button onClick={() => onBegin(item.project.id, session.mode)}>{session.status === 'ready' ? '开始学一点' : '继续学一点'}<ChevronRight size={18} /></button></div>
         </article>;
       })}
     </div>
@@ -138,8 +143,10 @@ function HomeScreen({ workspace, onAdd, onBegin }: { workspace: LearningWorkspac
   </section>;
 }
 
-function SessionScreen(props: { title: string; content: string; source: string; cursor: number; total: number; onAdvance: () => void; onLater: () => void; onPause: () => void }) {
+function SessionScreen(props: { mode: LearningMode; title: string; content: string; source: string; cursor: number; total: number; onAdvance: () => void; onLater: () => void; onPause: () => void }) {
   const isLast = props.cursor === props.total - 1;
+  if (props.mode === 'dialogue') return <DialogueSession {...props} isLast={isLast} />;
+  if (props.mode === 'galgame') return <GalgameSession {...props} isLast={isLast} />;
   return <section className="v2-page v2-session-page">
     <header className="v2-session-header"><button className="v2-icon-button" onClick={props.onPause} aria-label="今天先到这里"><X /></button><div><span>{props.title}</span><small>卡片 · 可以随时停</small></div><span className="v2-count">{props.cursor + 1}<i>/</i>{props.total}</span></header>
     <div className="v2-dots" aria-label={`第 ${props.cursor + 1} 个，共 ${props.total} 个`}>{Array.from({ length: props.total }, (_, index) => <span key={index} className={index <= props.cursor ? 'active' : ''} />)}</div>
@@ -154,6 +161,20 @@ function SessionScreen(props: { title: string; content: string; source: string; 
   </section>;
 }
 
-function PausedScreen({ title, touched, onHome, onContinue }: { title: string; touched: number; onHome: () => void; onContinue: () => void }) {
-  return <section className="v2-page v2-paused-page"><Brand /><div className="v2-bloom"><span><Feather /></span></div><p className="v2-kicker">轻轻收个尾</p><h1>今天和「{title}」<br /><em>碰了个面。</em></h1><p>接触了 {touched} 个片段。没有待办，也没有落后；想回来时，位置还在。</p><div className="v2-paused-actions"><button className="v2-primary" onClick={onHome}>回到项目 <ArrowRight size={18} /></button><button className="v2-text-button" onClick={onContinue}>还想再看一点</button></div></section>;
+function PausedScreen({ title, mode, touched, onHome, onContinue, onChooseMode }: { title: string; mode: LearningMode; touched: number; onHome: () => void; onContinue: () => void; onChooseMode: (mode: LearningMode) => void }) {
+  return <section className="v2-page v2-paused-page"><Brand /><div className="v2-bloom"><span><Feather /></span></div><p className="v2-kicker">轻轻收个尾</p><h1>今天和「{title}」<br /><em>碰了个面。</em></h1><p>用{modeLabel(mode)}接触了 {touched} 个片段。没有待办，也没有落后；想回来时，位置还在。</p><div className="v2-mode-picker"><span>下次想换种方式？</span><div>{mode !== 'card' && <button onClick={() => onChooseMode('card')}><BookOpen />卡片</button>}{mode !== 'dialogue' && <button onClick={() => onChooseMode('dialogue')}><Users />群聊</button>}{mode !== 'galgame' && <button onClick={() => onChooseMode('galgame')}><Gamepad2 />Galgame</button>}</div></div><div className="v2-paused-actions"><button className="v2-primary" onClick={onHome}>回到项目 <ArrowRight size={18} /></button><button className="v2-text-button" onClick={onContinue}>继续当前方式</button></div></section>;
+}
+
+function DialogueSession(props: Parameters<typeof SessionScreen>[0] & { isLast: boolean }) {
+  const beat = createDialogueBeat({ content: props.content, index: props.cursor });
+  return <section className="v2-page v2-dialogue-page"><header className="v2-session-header"><button className="v2-icon-button" onClick={props.onPause} aria-label="今天先到这里"><X /></button><div><span>{props.title} · 小群</span><small>群聊 · 只聊当前项目</small></div><span className="v2-count">{props.cursor + 1}<i>/</i>{props.total}</span></header><div className="v2-chat-stage"><div className="v2-chat-note">3 位伙伴正在把同一个知识点说人话</div><div className="v2-chat-row"><span className="v2-avatar">{beat.avatar}</span><div><small>{beat.speaker} · {beat.role}</small><p>{beat.message}</p></div></div><div className="v2-chat-row self"><span className="v2-avatar">我</span><div><small>你可以只看，不必回复</small><p>嗯，我先记住这一小点。</p></div></div><details><summary>对应的原文</summary><blockquote>{beat.sourceText}</blockquote></details></div><div className="v2-session-actions"><button className="v2-secondary" onClick={props.onLater}>先潜水</button><button className="v2-primary" onClick={props.onAdvance}>{props.isLast ? '先聊到这' : '看看新消息'}<ArrowRight size={18} /></button></div></section>;
+}
+
+function GalgameSession(props: Parameters<typeof SessionScreen>[0] & { isLast: boolean }) {
+  const beat = createGalgameBeat({ content: props.content, index: props.cursor });
+  return <section className="v2-page v2-galgame-page"><header className="v2-session-header"><button className="v2-icon-button" onClick={props.onPause} aria-label="保存并离开"><X /></button><div><span>{props.title}</span><small>Galgame · 线索 {props.cursor + 1}</small></div><span className="v2-count">{props.cursor + 1}<i>/</i>{props.total}</span></header><div className="v2-scene"><div className="v2-moon" /><span className="v2-scene-name">{beat.scene}</span><div className="v2-character" aria-hidden="true"><span>{beat.character.slice(0, 1)}</span></div><div className="v2-dialogue-box"><strong>{beat.character}</strong><p>{beat.dialogue}</p><details><summary>查看素材线索</summary><blockquote>{beat.sourceText}</blockquote></details></div></div><div className="v2-session-actions"><button className="v2-secondary" onClick={props.onLater}>暂存线索</button><button className="v2-primary" onClick={props.onAdvance}>{props.isLast ? '保存进度' : '继续故事'}<ArrowRight size={18} /></button></div></section>;
+}
+
+function modeLabel(mode: LearningMode) {
+  return mode === 'card' ? '卡片' : mode === 'dialogue' ? '群聊' : 'Galgame';
 }

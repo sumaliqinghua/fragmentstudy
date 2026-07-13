@@ -52,3 +52,24 @@ test('advancing records exposure without claiming mastery', () => {
   assert.equal(workspace.exposures[0].projectId, projectId);
   assert.equal('mastered' in workspace.exposures[0], false);
 });
+
+test('modes share fragments but keep independent narrative cursors', () => {
+  let workspace = importTextProject(createWorkspace(), { title: 'A', content: '第一点解释一个值得记住的概念。第二点提供一个具体可用的例子。第三点补充这个方法适用的边界。第四点邀请你下次再回来看看。', now: '2026-07-13T00:00:00Z', createId: ids });
+  const projectId = workspace.projects[0].project.id;
+  workspace = startWorkspaceSession(workspace, { projectId, mode: 'dialogue', now: '2026-07-13T00:01:00Z', createId: ids });
+  workspace = advanceWorkspaceSession(workspace, { projectId, mode: 'dialogue', now: '2026-07-13T00:02:00Z', createId: ids });
+
+  assert.throws(
+    () => startWorkspaceSession(workspace, { projectId, mode: 'galgame', now: '2026-07-13T00:03:00Z', createId: ids }),
+    /pause the current session/i,
+  );
+
+  workspace = pauseWorkspaceSession(workspace, { projectId, mode: 'dialogue', now: '2026-07-13T00:04:00Z' });
+  workspace = startWorkspaceSession(workspace, { projectId, mode: 'galgame', now: '2026-07-13T00:05:00Z', createId: ids });
+  const dialogue = workspace.sessions.find((session) => session.projectId === projectId && session.mode === 'dialogue');
+  const galgame = workspace.sessions.find((session) => session.projectId === projectId && session.mode === 'galgame');
+
+  assert.equal(dialogue?.cursor, 1);
+  assert.equal(galgame?.cursor, 0);
+  assert.deepEqual(galgame?.itemIds, dialogue?.itemIds);
+});
