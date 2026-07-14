@@ -19,6 +19,9 @@ import type {
   QuizGenerationResult,
   Tag,
   ArticleTag,
+  Subject,
+  ArticleSourceMetadata,
+  LearningMode,
 } from '../types';
 
 const STORAGE_PREFIX = 'guest_';
@@ -54,6 +57,10 @@ function setCardsStore(articleId: string, cards: Card[]): void {
 
 function getProgressStore(): Record<string, LearningProgress> {
   return getItem<Record<string, LearningProgress>>('progress') || {};
+}
+
+function getProgressKey(articleId: string, mode: LearningMode): string {
+  return `${articleId}:${mode}`;
 }
 
 function setProgressStore(progress: Record<string, LearningProgress>): void {
@@ -148,13 +155,21 @@ function setArticleTagsStore(articleTags: ArticleTag[]): void {
   setItem('article_tags', articleTags);
 }
 
+function getSubjectsStore(): Subject[] {
+  return getItem<Subject[]>('subjects') || [];
+}
+
+function setSubjectsStore(subjects: Subject[]): void {
+  setItem('subjects', subjects);
+}
+
 export async function getArticles(): Promise<ArticleWithProgress[]> {
   const articles = getArticlesStore();
   const progressStore = getProgressStore();
   const articleTags = getArticleTagsStore();
 
   return articles.map(article => {
-    const progress = progressStore[article.id];
+    const progress = progressStore[getProgressKey(article.id, 'card')];
     const cards = getCardsStore(article.id);
     const dialogueMessages = getDialogueMessagesStore(article.id);
     const galgameMessages = getGalgameMessagesStore(article.id);
@@ -186,7 +201,8 @@ export async function createArticle(
   title: string,
   content: string,
   mode: ArticleMode = 'source',
-  characters?: string
+  characters?: string,
+  metadata: ArticleSourceMetadata = {}
 ): Promise<Article> {
   const article: Article = {
     id: generateId(),
@@ -194,6 +210,9 @@ export async function createArticle(
     original_content: content,
     mode,
     characters,
+    subject_id: metadata.subjectId ?? null,
+    source_type: metadata.sourceType ?? 'text',
+    source_url: metadata.sourceUrl ?? null,
     tagIds: [],
     created_at: new Date().toISOString(),
   };
@@ -215,7 +234,9 @@ export async function deleteArticle(id: string): Promise<void> {
   localStorage.removeItem(STORAGE_PREFIX + `quiz_${id}`);
 
   const progressStore = getProgressStore();
-  delete progressStore[id];
+  for (const key of Object.keys(progressStore)) {
+    if (key.startsWith(`${id}:`)) delete progressStore[key];
+  }
   setProgressStore(progressStore);
 
   const rewards = getRewardsStore();
@@ -223,6 +244,25 @@ export async function deleteArticle(id: string): Promise<void> {
 
   const articleTags = getArticleTagsStore();
   setArticleTagsStore(articleTags.filter(tag => tag.article_id !== id));
+}
+
+export async function getSubjects(): Promise<Subject[]> {
+  return getSubjectsStore().sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function createSubject(name: string): Promise<Subject> {
+  const normalized = name.trim();
+  const subjects = getSubjectsStore();
+  const existing = subjects.find(subject => subject.name.toLowerCase() === normalized.toLowerCase());
+  if (existing) return existing;
+  const subject: Subject = {
+    id: generateId(),
+    name: normalized,
+    created_at: new Date().toISOString(),
+  };
+  subjects.push(subject);
+  setSubjectsStore(subjects);
+  return subject;
 }
 
 export async function getTags(): Promise<Tag[]> {
@@ -277,7 +317,7 @@ export async function getCards(articleId: string): Promise<Card[]> {
 
 export async function createCards(
   articleId: string,
-  cards: Omit<Card, 'id' | 'article_id' | 'created_at'>[]
+  cards: Omit<Card, 'id' | 'article_id' | 'created_at' | 'sequence_order'>[]
 ): Promise<Card[]> {
   const newCards: Card[] = cards.map((card, index) => ({
     ...card,
@@ -291,29 +331,35 @@ export async function createCards(
   return newCards;
 }
 
-export async function getProgress(articleId: string): Promise<LearningProgress | null> {
+export async function getProgress(
+  articleId: string,
+  mode: LearningMode = 'card'
+): Promise<LearningProgress | null> {
   const progressStore = getProgressStore();
-  return progressStore[articleId] || null;
+  return progressStore[getProgressKey(articleId, mode)] || null;
 }
 
 export async function upsertProgress(
   articleId: string,
   currentIndex: number,
-  totalCount: number
+  totalCount: number,
+  mode: LearningMode = 'card'
 ): Promise<LearningProgress> {
   const progressStore = getProgressStore();
-  const existing = progressStore[articleId];
+  const progressKey = getProgressKey(articleId, mode);
+  const existing = progressStore[progressKey];
 
   const progress: LearningProgress = {
     id: existing?.id || generateId(),
     article_id: articleId,
+    mode,
     current_index: currentIndex,
     completed_count: currentIndex + 1,
     total_count: totalCount,
     last_read_at: new Date().toISOString(),
   };
 
-  progressStore[articleId] = progress;
+  progressStore[progressKey] = progress;
   setProgressStore(progressStore);
 
   return progress;

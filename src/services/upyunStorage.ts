@@ -280,7 +280,7 @@ function md5(str: string): string {
   }
   
   // 处理字符串
-  let n = str.length;
+  const n = str.length;
   const state = [1732584193, -271733879, -1732584194, 271733878];
   let i: number;
   

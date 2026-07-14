@@ -14,14 +14,16 @@ import {
   getTotalPoints,
   getArticlesCacheSnapshot,
   getTags,
+  getSubjects,
 } from '../services/dataService';
 import { LearningPath } from '../components/LearningPath';
 import { generateLearningPath, type PathNode } from '../utils/pathGenerator';
-import type { ArticleWithProgress, Card, LearningProgress, QuizQuestion, Tag } from '../types';
+import type { ArticleWithProgress, Card, LearningProgress, QuizQuestion, Subject, Tag } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { getStreakDays } from '../utils/streak';
 
 const UNCATEGORIZED_TAG_ID = 'uncategorized';
+const UNCATEGORIZED_SUBJECT_ID = 'uncategorized-subject';
 
 interface HomeProps {
   onSelectArticle: (id: string) => void;
@@ -67,6 +69,8 @@ export function Home({
   const [showDropdown, setShowDropdown] = useState(false);
   const [showTagDrawer, setShowTagDrawer] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -83,7 +87,7 @@ export function Home({
     [articles, selectedArticleId]
   );
 
-  const tagsById = useMemo(() => new Map(tags.map(tag => [tag.id, tag])), [tags]);
+  const subjectsById = useMemo(() => new Map(subjects.map(subject => [subject.id, subject])), [subjects]);
 
   const childrenByParent = useMemo(() => {
     const map = new Map<string | null, Tag[]>();
@@ -119,13 +123,27 @@ export function Home({
   }, [tags, childrenByParent]);
 
   const filteredArticles = useMemo(() => {
-    if (!selectedTagId) return articles;
+    const subjectFiltered = selectedSubjectId === UNCATEGORIZED_SUBJECT_ID
+      ? articles.filter(article => !article.subject_id)
+      : selectedSubjectId
+        ? articles.filter(article => article.subject_id === selectedSubjectId)
+        : articles;
+    if (!selectedTagId) return subjectFiltered;
     if (selectedTagId === UNCATEGORIZED_TAG_ID) {
-      return articles.filter(article => (article.tagIds || []).length === 0);
+      return subjectFiltered.filter(article => (article.tagIds || []).length === 0);
     }
     const descendants = descendantMap.get(selectedTagId) || new Set([selectedTagId]);
-    return articles.filter(article => (article.tagIds || []).some(tagId => descendants.has(tagId)));
-  }, [articles, selectedTagId, descendantMap]);
+    return subjectFiltered.filter(article => (article.tagIds || []).some(tagId => descendants.has(tagId)));
+  }, [articles, descendantMap, selectedSubjectId, selectedTagId]);
+
+  const subjectCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    subjects.forEach(subject => counts.set(subject.id, 0));
+    articles.forEach(article => {
+      if (article.subject_id) counts.set(article.subject_id, (counts.get(article.subject_id) || 0) + 1);
+    });
+    return counts;
+  }, [articles, subjects]);
 
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -193,18 +211,17 @@ export function Home({
   }, [user]);
 
   useEffect(() => {
-    const loadTags = () => {
-      getTags()
-        .then(setTags)
+    const loadOrganization = () => {
+      Promise.all([getTags(), getSubjects()])
+        .then(([tagData, subjectData]) => {
+          setTags(tagData);
+          setSubjects(subjectData);
+        })
         .catch((error) => {
-          console.error('Failed to load tags:', error);
+          console.error('Failed to load organization data:', error);
         });
     };
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(loadTags);
-    } else {
-      setTimeout(loadTags, 0);
-    }
+    loadOrganization();
   }, [user]);
 
   useEffect(() => {
@@ -278,6 +295,7 @@ export function Home({
     const handleProgressUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ articleId?: string; progress?: LearningProgress | null }>).detail;
       if (!detail?.articleId) return;
+      if (detail.progress?.mode && detail.progress.mode !== 'card') return;
       if (detail.articleId === selectedArticleId) {
         setProgress(detail.progress ?? null);
       }
@@ -308,7 +326,6 @@ export function Home({
 
   const handleNodeClick = (node: PathNode) => {
     if (!selectedArticleId) return;
-    if (node.status === 'locked') return;
     if (onOpenNode) {
       onOpenNode(node, selectedArticleId);
       return;
@@ -369,29 +386,37 @@ export function Home({
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
       <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-4 pt-6">
-        <header className="flex items-center justify-between gap-4">
-          <div className="relative">
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="relative w-full sm:w-auto">
             <button
               onClick={() => setShowDropdown((prev) => !prev)}
-              className="flex items-center gap-2 px-3 py-2 bg-white rounded-2xl shadow-sm border border-slate-100"
+              className="w-full sm:w-auto flex items-center justify-between gap-2 px-3 py-2 bg-white rounded-2xl shadow-sm border border-slate-100"
             >
               <div>
-                <p className="text-xs text-slate-400">当前文章</p>
+                <p className="text-xs text-slate-400">
+                  {selectedArticle?.subject_id ? subjectsById.get(selectedArticle.subject_id)?.name || '当前科目' : '未分类'}
+                </p>
                 <p className="text-sm font-semibold text-slate-800 font-display max-w-[180px] truncate">
-                  {isInitialLoading ? '加载中...' : (selectedArticle?.title || '请选择文章')}
+                  {isInitialLoading ? '加载中...' : (selectedArticle?.title || '请选择资料')}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  标签：{isInitialLoading
-                    ? '加载中'
-                    : selectedTagId
-                    ? (selectedTagId === UNCATEGORIZED_TAG_ID ? '未分类' : (tagsById.get(selectedTagId)?.name || '未知'))
-                    : '全部'}
-                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">点击切换科目与资料</p>
               </div>
               <ChevronDown className="w-4 h-4 text-slate-500" />
             </button>
             {showDropdown && (
-              <div className="absolute mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-lg z-20 overflow-hidden">
+              <div className="absolute mt-2 w-72 bg-white border border-slate-100 rounded-2xl shadow-lg z-20 overflow-hidden">
+                <div className="p-3 border-b border-slate-100">
+                  <p className="text-[11px] text-slate-400 mb-2">先选科目</p>
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                    <button onClick={() => setSelectedSubjectId(null)} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${selectedSubjectId === null ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600'}`}>全部</button>
+                    {subjects.map(subject => (
+                      <button key={subject.id} onClick={() => setSelectedSubjectId(subject.id)} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${selectedSubjectId === subject.id ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        {subject.name} {subjectCounts.get(subject.id) || 0}
+                      </button>
+                    ))}
+                    <button onClick={() => setSelectedSubjectId(UNCATEGORIZED_SUBJECT_ID)} className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${selectedSubjectId === UNCATEGORIZED_SUBJECT_ID ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600'}`}>未分类</button>
+                  </div>
+                </div>
                 {isInitialLoading && (
                   <div className="px-4 py-3 text-sm text-slate-400">加载中...</div>
                 )}
@@ -399,31 +424,32 @@ export function Home({
                   <button
                     key={article.id}
                     onClick={() => handleSelectArticle(article.id)}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${article.id === selectedArticleId ? 'text-primary font-semibold bg-primary/5' : 'text-slate-700'}`}
                   >
-                    {article.title}
+                    <span className="block truncate">{article.title}</span>
+                    <span className="block text-[11px] text-slate-400 mt-0.5">{article.subject_id ? subjectsById.get(article.subject_id)?.name || '科目' : '未分类'}</span>
                   </button>
                 ))}
                 {!isInitialLoading && filteredArticles.length === 0 && (
-                  <div className="px-4 py-3 text-sm text-slate-400">暂无文章</div>
+                  <div className="px-4 py-3 text-sm text-slate-400">暂无资料</div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowTagDrawer(true)}
-              className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm text-slate-700"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm text-slate-700 whitespace-nowrap"
             >
               <TagIcon className="w-4 h-4 text-slate-500" />
-              <span className="text-sm font-semibold">标签筛选</span>
+              <span className="text-sm font-semibold">标签</span>
             </button>
-            <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm whitespace-nowrap">
               <Flame className="w-4 h-4 text-orange-500" />
               <span className="text-sm font-semibold text-slate-700">{streakDays} 天</span>
             </div>
-            <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm whitespace-nowrap">
               <Gem className="w-4 h-4 text-secondary" />
               <span className="text-sm font-semibold text-slate-700">{totalPoints}</span>
             </div>
@@ -433,12 +459,12 @@ export function Home({
         {isInitialLoading ? (
           <div className="mt-16 text-center">
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="mt-4 text-slate-500">加载文章中...</p>
+            <p className="mt-4 text-slate-500">加载资料中...</p>
           </div>
         ) : showEmptyState ? (
           <div className="mt-16 text-center bg-white border border-dashed border-slate-200 rounded-3xl p-10">
-            <p className="text-lg font-semibold text-slate-700">导入你的第一篇文章</p>
-            <p className="text-sm text-slate-400 mt-2">支持粘贴、上传 PDF 或 AI 生成</p>
+            <p className="text-lg font-semibold text-slate-700">导入你的第一份资料</p>
+            <p className="text-sm text-slate-400 mt-2">支持文本、网页链接、PDF 与 AI 生成</p>
             <button
               onClick={onCreate}
               className="mt-6 inline-flex items-center gap-2 px-5 py-3 bg-secondary text-white rounded-2xl shadow-[0_6px_0_0_#245aa3] active:translate-y-1"
@@ -449,14 +475,14 @@ export function Home({
           </div>
         ) : filteredArticles.length === 0 ? (
           <div className="mt-10 bg-white border border-slate-100 rounded-3xl p-8 text-center">
-            <p className="text-base font-semibold text-slate-700">该标签下暂无文章</p>
-            <p className="text-sm text-slate-400 mt-2">可以切换标签，或新增文章后再试</p>
+            <p className="text-base font-semibold text-slate-700">当前筛选下暂无资料</p>
+            <p className="text-sm text-slate-400 mt-2">可以切换科目或标签，也可以导入新资料</p>
             <button
               onClick={onCreate}
               className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-secondary text-white rounded-2xl shadow-[0_6px_0_0_#245aa3] active:translate-y-1"
             >
               <Plus className="w-4 h-4" />
-              新增文章
+              导入资料
             </button>
           </div>
         ) : (
@@ -464,7 +490,7 @@ export function Home({
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl font-bold text-slate-800 font-display">学习路径</h2>
-                <p className="text-sm text-slate-400">每完成 5 张卡片解锁一次测验</p>
+                <p className="text-sm text-slate-400">一次看一小节，随时停下来也没关系</p>
               </div>
               <button
                 onClick={() => selectedArticleId && onSelectArticle(selectedArticleId)}

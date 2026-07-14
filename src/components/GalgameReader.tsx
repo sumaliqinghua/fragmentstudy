@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, History, X, ChevronDown, Settings2, FileText, Cloud, Maximize2, Minimize2 } from 'lucide-react';
 import type { Article, GalgameMessage } from '../types';
-import { getGalgameMessages, upsertProgress } from '../services/dataService';
+import { getGalgameMessages, getProgress, upsertProgress } from '../services/dataService';
 import { OriginalTextView } from './OriginalTextView';
 import { idbGet, idbSet } from '../services/localAssetStore';
 import { CloudImagePicker } from './CloudImagePicker';
@@ -344,7 +344,7 @@ export function GalgameReader({ article, onBack, embedded = false, onFullscreenC
 
   useEffect(() => {
     if (messages.length > 0) {
-      upsertProgress(article.id, currentIndex, messages.length);
+      upsertProgress(article.id, currentIndex, messages.length, 'galgame');
     }
   }, [currentIndex, messages.length, article.id]);
 
@@ -370,12 +370,12 @@ export function GalgameReader({ article, onBack, embedded = false, onFullscreenC
 
   const loadMessages = async () => {
     try {
-      const data = await getGalgameMessages(article.id);
+      const [data, savedProgress] = await Promise.all([
+        getGalgameMessages(article.id),
+        getProgress(article.id, 'galgame'),
+      ]);
       setMessages(data);
-      if (data.length > 0) {
-        typeText(data[0].content);
-        triggerScreenEffect(data[0].screen_effect);
-      }
+      setCurrentIndex(Math.min(savedProgress?.current_index ?? 0, Math.max(0, data.length - 1)));
     } catch (error) {
       console.error('Failed to load galgame messages:', error);
     } finally {

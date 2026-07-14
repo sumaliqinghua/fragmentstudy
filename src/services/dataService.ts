@@ -20,6 +20,9 @@ import type {
   QuizQuestion,
   QuizGenerationResult,
   Tag,
+  Subject,
+  ArticleSourceMetadata,
+  LearningMode,
 } from '../types';
 
 type CacheEntry<T> = {
@@ -33,6 +36,7 @@ const cache = {
   articles: null as CacheEntry<ArticleWithProgress[]> | null,
   articlesById: new Map<string, CacheEntry<Article>>(),
   tags: null as CacheEntry<Tag[]> | null,
+  subjects: null as CacheEntry<Subject[]> | null,
   articleTagsByArticleId: new Map<string, CacheEntry<string[]>>(),
   cardsByArticleId: new Map<string, CacheEntry<Card[]>>(),
   progressByArticleId: new Map<string, CacheEntry<LearningProgress | null>>(),
@@ -41,6 +45,10 @@ const cache = {
   galgameByArticleId: new Map<string, CacheEntry<GalgameMessage[]>>(),
   quizByArticleId: new Map<string, CacheEntry<QuizQuestion[]>>(),
 };
+
+function progressCacheKey(articleId: string, mode: LearningMode): string {
+  return `${articleId}:${mode}`;
+}
 
 function notifyCardsUpdated(articleId: string): void {
   if (typeof window === 'undefined') return;
@@ -136,9 +144,13 @@ export function getGalgameCacheSnapshot(articleId: string): GalgameMessage[] | u
   return cache.galgameByArticleId.get(articleId)?.data;
 }
 
-export function getProgressCacheSnapshot(articleId: string): LearningProgress | null | undefined {
-  if (!cache.progressByArticleId.has(articleId)) return undefined;
-  return cache.progressByArticleId.get(articleId)?.data ?? null;
+export function getProgressCacheSnapshot(
+  articleId: string,
+  mode: LearningMode = 'card'
+): LearningProgress | null | undefined {
+  const key = progressCacheKey(articleId, mode);
+  if (!cache.progressByArticleId.has(key)) return undefined;
+  return cache.progressByArticleId.get(key)?.data ?? null;
 }
 
 export function getRewardsCacheSnapshot(articleId: string): Reward[] | undefined {
@@ -205,7 +217,8 @@ async function getProgressMapForArticles(articleIds: string[]): Promise<Map<stri
   const { data, error } = await supabase
     .from('learning_progress')
     .select('*')
-    .in('article_id', articleIds);
+    .in('article_id', articleIds)
+    .eq('mode', 'card');
 
   if (error) {
     if (isMissingTableError(error)) {
@@ -311,7 +324,7 @@ export async function getArticles(): Promise<ArticleWithProgress[]> {
     };
     cache.articlesById.set(article.id, { data: enriched, ts: Date.now() });
     setCacheEntry(cache.articleTagsByArticleId, article.id, enriched.tagIds || []);
-    setCacheEntry(cache.progressByArticleId, article.id, progress ?? null);
+    setCacheEntry(cache.progressByArticleId, progressCacheKey(article.id, 'card'), progress ?? null);
     return enriched;
   });
 
@@ -337,7 +350,7 @@ export async function getArticlesLite(): Promise<ArticleWithProgress[]> {
   if (!articles) return [];
 
   const articlesLite = articles.map((article) => {
-    const cachedProgress = cache.progressByArticleId.get(article.id)?.data ?? null;
+    const cachedProgress = cache.progressByArticleId.get(progressCacheKey(article.id, 'card'))?.data ?? null;
     const cachedTags = cache.articleTagsByArticleId.get(article.id)?.data ?? [];
     const enriched: ArticleWithProgress = {
       ...article,
@@ -392,16 +405,26 @@ export async function createArticle(
   title: string,
   content: string,
   mode: ArticleMode = 'source',
-  characters?: string
+  characters?: string,
+  metadata: ArticleSourceMetadata = {}
 ): Promise<Article> {
   if (!(await isAuthenticated())) {
-    return guestStorage.createArticle(title, content, mode, characters);
+    return guestStorage.createArticle(title, content, mode, characters, metadata);
   }
 
   const userId = await getUserId();
   const { data, error } = await supabase
     .from('articles')
-    .insert({ title, original_content: content, mode, characters, user_id: userId })
+    .insert({
+      title,
+      original_content: content,
+      mode,
+      characters,
+      user_id: userId,
+      subject_id: metadata.subjectId ?? null,
+      source_type: metadata.sourceType ?? 'text',
+      source_url: metadata.sourceUrl ?? null,
+    })
     .select()
     .single();
 
@@ -424,12 +447,67 @@ export async function deleteArticle(id: string): Promise<void> {
   cache.articlesById.delete(id);
   cache.articleTagsByArticleId.delete(id);
   cache.cardsByArticleId.delete(id);
-  cache.progressByArticleId.delete(id);
+  for (const key of cache.progressByArticleId.keys()) {
+    if (key.startsWith(`${id}:`)) cache.progressByArticleId.delete(key);
+  }
   cache.rewardsByArticleId.delete(id);
   cache.dialogueByArticleId.delete(id);
   cache.galgameByArticleId.delete(id);
   cache.quizByArticleId.delete(id);
   invalidateArticlesCache();
+}
+
+export async function getSubjects(): Promise<Subject[]> {
+  if (!(await isAuthenticated())) {
+    return guestStorage.getSubjects();
+  }
+  if (missingTables.has('subjects')) return [];
+  if (isFresh(cache.subjects)) return cache.subjects.data;
+
+  const { data, error } = await supabase
+    .from('subjects')
+    .select('*')
+    .order('name', { ascending: true });
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('subjects');
+      return [];
+    }
+    throw error;
+  }
+  const result = data || [];
+  cache.subjects = { data: result, ts: Date.now() };
+  return result;
+}
+
+export async function createSubject(name: string): Promise<Subject> {
+  const normalized = name.trim();
+  if (!normalized) throw new Error('请输入科目名称');
+  if (!(await isAuthenticated())) {
+    const subject = await guestStorage.createSubject(normalized);
+    cache.subjects = null;
+    return subject;
+  }
+
+  const existing = (await getSubjects()).find(
+    subject => subject.name.toLowerCase() === normalized.toLowerCase()
+  );
+  if (existing) return existing;
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('subjects')
+    .insert({ name: normalized, user_id: userId })
+    .select()
+    .single();
+  if (error) {
+    if (isMissingTableError(error)) {
+      missingTables.add('subjects');
+      throw new Error('科目表未创建，请先执行 Supabase 迁移。');
+    }
+    throw error;
+  }
+  cache.subjects = null;
+  return data;
 }
 
 export async function getTags(): Promise<Tag[]> {
@@ -577,7 +655,7 @@ export async function getCards(articleId: string): Promise<Card[]> {
 
 export async function createCards(
   articleId: string,
-  cards: Omit<Card, 'id' | 'article_id' | 'created_at'>[]
+  cards: Omit<Card, 'id' | 'article_id' | 'created_at' | 'sequence_order'>[]
 ): Promise<Card[]> {
   if (!(await isAuthenticated())) {
     const result = await guestStorage.createCards(articleId, cards);
@@ -605,12 +683,16 @@ export async function createCards(
   return result;
 }
 
-export async function getProgress(articleId: string): Promise<LearningProgress | null> {
+export async function getProgress(
+  articleId: string,
+  mode: LearningMode = 'card'
+): Promise<LearningProgress | null> {
   if (!(await isAuthenticated())) {
-    return guestStorage.getProgress(articleId);
+    return guestStorage.getProgress(articleId, mode);
   }
 
-  const cached = getCacheEntryAllowNull(cache.progressByArticleId, articleId);
+  const cacheKey = progressCacheKey(articleId, mode);
+  const cached = getCacheEntryAllowNull(cache.progressByArticleId, cacheKey);
   if (cached.hit) {
     return cached.data;
   }
@@ -619,21 +701,23 @@ export async function getProgress(articleId: string): Promise<LearningProgress |
     .from('learning_progress')
     .select('*')
     .eq('article_id', articleId)
+    .eq('mode', mode)
     .maybeSingle();
 
   if (error) throw error;
-  setCacheEntry(cache.progressByArticleId, articleId, data ?? null);
+  setCacheEntry(cache.progressByArticleId, cacheKey, data ?? null);
   return data;
 }
 
 export async function upsertProgress(
   articleId: string,
   currentIndex: number,
-  totalCount: number
+  totalCount: number,
+  mode: LearningMode = 'card'
 ): Promise<LearningProgress> {
   if (!(await isAuthenticated())) {
-    const result = await guestStorage.upsertProgress(articleId, currentIndex, totalCount);
-    setCacheEntry(cache.progressByArticleId, articleId, result);
+    const result = await guestStorage.upsertProgress(articleId, currentIndex, totalCount, mode);
+    setCacheEntry(cache.progressByArticleId, progressCacheKey(articleId, mode), result);
     notifyProgressUpdated(articleId, result);
     return result;
   }
@@ -646,18 +730,19 @@ export async function upsertProgress(
     .upsert({
       article_id: articleId,
       user_id: userId,
+      mode,
       current_index: currentIndex,
       completed_count: completedCount,
       total_count: totalCount,
       last_read_at: new Date().toISOString(),
     }, {
-      onConflict: 'user_id,article_id',
+      onConflict: 'user_id,article_id,mode',
     })
     .select()
     .single();
 
   if (error) throw error;
-  setCacheEntry(cache.progressByArticleId, articleId, data);
+  setCacheEntry(cache.progressByArticleId, progressCacheKey(articleId, mode), data);
   notifyProgressUpdated(articleId, data);
   return data;
 }

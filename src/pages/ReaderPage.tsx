@@ -4,7 +4,6 @@ import {
   createDialogueMessages,
   createGalgameMessages,
   getArticle,
-  getCards,
   getDialogueMessages,
   getGalgameMessages,
   getProgress,
@@ -13,7 +12,7 @@ import { SegmentControl } from '../components/SegmentControl';
 import { OriginalReader } from '../components/OriginalReader';
 import { DialogueReader } from '../components/DialogueReader';
 import { GalgameReader } from '../components/GalgameReader';
-import type { Article, Card, LearningProgress } from '../types';
+import type { Article, LearningMode, LearningProgress } from '../types';
 import { AIResponseParseError, convertToDialogue, convertToGalgame, isConfigured } from '../services/openai';
 
 export type ReaderMode = 'original' | 'dialogue' | 'galgame';
@@ -29,8 +28,7 @@ interface ReaderPageProps {
 export function ReaderPage({ articleId, initialMode = 'original', onBack, onStartQuiz, onFullscreenChange }: ReaderPageProps) {
   const [mode, setMode] = useState<ReaderMode>(initialMode);
   const [article, setArticle] = useState<Article | null>(null);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [progress, setProgress] = useState<LearningProgress | null>(null);
+  const [modeProgress, setModeProgress] = useState<Partial<Record<LearningMode, LearningProgress | null>>>({});
   const [dialogueCount, setDialogueCount] = useState(0);
   const [galgameCount, setGalgameCount] = useState(0);
   const [isGalgameFullscreen, setIsGalgameFullscreen] = useState(false);
@@ -60,16 +58,16 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [articleData, cardsData, progressData, dialogueData, galgameData] = await Promise.all([
+        const [articleData, cardProgress, dialogueProgress, galgameProgress, dialogueData, galgameData] = await Promise.all([
           getArticle(articleId),
-          getCards(articleId),
-          getProgress(articleId),
+          getProgress(articleId, 'card'),
+          getProgress(articleId, 'dialogue'),
+          getProgress(articleId, 'galgame'),
           getDialogueMessages(articleId),
           getGalgameMessages(articleId),
         ]);
         setArticle(articleData);
-        setCards(cardsData);
-        setProgress(progressData);
+        setModeProgress({ card: cardProgress, dialogue: dialogueProgress, galgame: galgameProgress });
         setDialogueCount(dialogueData.length);
         setGalgameCount(galgameData.length);
       } catch (error) {
@@ -80,6 +78,16 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
     };
 
     loadData();
+  }, [articleId]);
+
+  useEffect(() => {
+    const handleProgressUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ articleId?: string; progress?: LearningProgress | null }>).detail;
+      if (detail?.articleId !== articleId || !detail.progress) return;
+      setModeProgress(prev => ({ ...prev, [detail.progress!.mode]: detail.progress }));
+    };
+    window.addEventListener('progress:update', handleProgressUpdate);
+    return () => window.removeEventListener('progress:update', handleProgressUpdate);
   }, [articleId]);
 
   const loadDialogueCounts = async () => {
@@ -142,9 +150,11 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
   };
 
   const progressPercent = useMemo(() => {
-    if (!progress || cards.length === 0) return 0;
-    return Math.min(100, Math.round(((progress.current_index + 1) / cards.length) * 100));
-  }, [cards.length, progress]);
+    const progressMode: LearningMode = mode === 'original' ? 'card' : mode;
+    const progress = modeProgress[progressMode];
+    if (!progress || progress.total_count === 0) return 0;
+    return Math.min(100, Math.round(((progress.current_index + 1) / progress.total_count) * 100));
+  }, [mode, modeProgress]);
   const displayProgress = mode === 'original' ? readingPercent : progressPercent;
 
   const hideReaderChrome = mode === 'galgame' && galgameCount > 0 && isGalgameFullscreen;
@@ -317,7 +327,7 @@ export function ReaderPage({ articleId, initialMode = 'original', onBack, onStar
                 取消
               </button>
               <button
-                onClick={() => handleGenerateDialogue(characterModal.mode)}
+                onClick={() => characterModal.mode && handleGenerateDialogue(characterModal.mode)}
                 disabled={isGenerating || !characters.trim()}
                 className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-300"
               >

@@ -103,7 +103,7 @@ export async function getCards(articleId: string): Promise<Card[]> {
   return data || [];
 }
 
-export async function createCards(articleId: string, cards: Omit<Card, 'id' | 'article_id' | 'created_at'>[]): Promise<Card[]> {
+export async function createCards(articleId: string, cards: Omit<Card, 'id' | 'article_id' | 'created_at' | 'sequence_order'>[]): Promise<Card[]> {
   const cardsToInsert = cards.map((card, index) => ({
     ...card,
     article_id: articleId,

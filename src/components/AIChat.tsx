@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Send, BookOpen, Lightbulb, Link2, Loader2, History, ChevronDown } from 'lucide-react';
+import { X, Send, BookOpen, Lightbulb, Link2, Loader2, History } from 'lucide-react';
 import { explainCard, isConfigured } from '../services/openai';
 import { getConversations, saveConversation } from '../services/dataService';
 import type { Card, AIConversation } from '../types';
@@ -34,7 +34,6 @@ export function AIChat({ isOpen, currentCard, previousCards, onClose, onConversa
   const [customQuestion, setCustomQuestion] = useState('');
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [currentQuestionType, setCurrentQuestionType] = useState<string>('');
   const [currentQuestion, setCurrentQuestion] = useState('');
   const responseRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +43,6 @@ export function AIChat({ isOpen, currentCard, previousCards, onClose, onConversa
       setResponse('');
       setError('');
       setCustomQuestion('');
-      setCurrentQuestionType('');
       setCurrentQuestion('');
     }
   }, [isOpen, currentCard?.id]);
@@ -81,7 +79,6 @@ export function AIChat({ isOpen, currentCard, previousCards, onClose, onConversa
     setIsLoading(true);
     setResponse('');
     setError('');
-    setCurrentQuestionType(questionType);
     setCurrentQuestion(questionText);
     setShowHistory(false);
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, KeyRound, LogIn, LogOut, Palette, User } from 'lucide-react';
+import { Bell, KeyRound, Palette, User } from 'lucide-react';
 import { getArticles, getTotalPoints } from '../services/dataService';
 import { SettingsModal } from '../components/SettingsModal';
 import { AuthModal } from '../components/AuthModal';

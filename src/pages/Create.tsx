@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileText, Sparkles, UploadCloud } from 'lucide-react';
-import { ArticleInput } from '../components/ArticleInput';
+import { ArrowLeft, FileText, Link2, Sparkles, UploadCloud } from 'lucide-react';
+import { ArticleInput, type InputMode } from '../components/ArticleInput';
 import { getArticles, getArticlesCacheSnapshot } from '../services/dataService';
 import type { ArticleWithProgress } from '../types';
 
@@ -8,8 +8,6 @@ interface CreateProps {
   onBack?: () => void;
   onSelectArticle?: (id: string) => void;
 }
-
-type InputMode = 'paste' | 'pdf' | 'ai';
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -64,7 +62,7 @@ export function Create({ onBack, onSelectArticle }: CreateProps) {
           </button>
           <h2 className="text-slate-900 text-lg font-bold flex-1 text-center">导入内容</h2>
           <button className="flex w-12 items-center justify-end group">
-            <span className="text-primary text-sm font-bold group-hover:opacity-80">Help</span>
+            <span className="text-primary text-sm font-bold group-hover:opacity-80">帮助</span>
           </button>
         </header>
 
@@ -103,6 +101,18 @@ export function Create({ onBack, onSelectArticle }: CreateProps) {
             </div>
           </button>
 
+          <button onClick={() => openInput('url')} className="group w-full text-left">
+            <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100 transition-all active:scale-[0.98] hover:border-secondary/30 hover:shadow-md">
+              <div className="flex flex-col gap-1 flex-[2_2_0px]">
+                <p className="text-slate-900 text-lg font-bold leading-tight">识别网页链接</p>
+                <p className="text-slate-500 text-sm font-medium leading-normal">提取文章正文并保留来源</p>
+              </div>
+              <div className="size-16 rounded-xl flex items-center justify-center bg-white shrink-0 text-secondary shadow-sm border border-slate-100 group-hover:scale-105 transition-transform">
+                <Link2 className="w-7 h-7" />
+              </div>
+            </div>
+          </button>
+
           <button onClick={() => openInput('ai')} className="group w-full text-left">
             <div className="relative flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100 transition-all active:scale-[0.98] hover:border-primary/30 hover:shadow-md">
               <div className="flex flex-col gap-1 flex-[2_2_0px]">
@@ -123,8 +133,8 @@ export function Create({ onBack, onSelectArticle }: CreateProps) {
 
         <div className="flex flex-col px-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-slate-900 text-lg font-bold leading-tight">Jump back in</h3>
-            <button className="text-primary text-sm font-bold hover:text-primary-dark transition-colors">View all</button>
+            <h3 className="text-slate-900 text-lg font-bold leading-tight">最近学习</h3>
+            <button className="text-primary text-sm font-bold hover:text-primary-dark transition-colors">查看全部</button>
           </div>
           {isLoading ? (
             <div className="py-6 text-sm text-slate-400">加载中...</div>

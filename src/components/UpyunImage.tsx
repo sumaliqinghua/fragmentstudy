@@ -120,7 +120,6 @@ interface UpyunGalleryProps {
 export function UpyunGallery({
   paths,
   cacheOptions,
-  concurrency = 3,
   imageClassName = 'w-full h-auto rounded',
   containerClassName = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4',
   onImageClick,

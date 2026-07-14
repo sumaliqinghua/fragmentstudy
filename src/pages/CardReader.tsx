@@ -258,21 +258,24 @@ export function CardReader({ articleId, onBack, onOpenOriginal }: CardReaderProp
 
       <footer className="shrink-0 pb-10 pt-4 px-6 flex justify-center items-center gap-6">
         <button
-          aria-label="Skip"
+          aria-label="先放着"
+          title="先放着"
           onClick={handleNext}
           className="flex items-center justify-center size-14 rounded-full bg-white border-2 border-slate-200 text-slate-300 shadow-sm hover:border-rose-400 hover:text-rose-500 transition-all"
         >
           <X className="w-6 h-6" />
         </button>
         <button
-          aria-label="Previous"
+          aria-label="回看上一段"
+          title="回看上一段"
           onClick={handlePrev}
           className="flex items-center justify-center size-11 rounded-full bg-transparent text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors"
         >
           <RotateCcw className="w-5 h-5" />
         </button>
         <button
-          aria-label="Mastered"
+          aria-label="这段看完了"
+          title="这段看完了"
           onClick={handleNext}
           className="flex items-center justify-center size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary-dark transition-all"
         >

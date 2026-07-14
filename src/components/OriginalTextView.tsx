@@ -53,7 +53,6 @@ export function OriginalTextView({
   const [highlightText, setHighlightText] = useState<string>('');
   const [selection, setSelection] = useState<TextSelection | null>(null);
   const [annotations, setAnnotations] = useState<ArticleTextAnnotation[]>([]);
-  const [qaRecords, setQaRecords] = useState<ArticleTextQA[]>([]);
   const [qaRanges, setQaRanges] = useState<QARange[]>([]);
   const [showAskAI, setShowAskAI] = useState(false);
   const [includeFullArticle, setIncludeFullArticle] = useState(true);
@@ -100,7 +99,6 @@ export function OriginalTextView({
   const loadQARecords = async () => {
     try {
       const data = await getArticleTextQAs(articleId);
-      setQaRecords(data);
       const ranges: QARange[] = [];
       const rangeMap = new Map<string, number>();
       for (const qa of data) {
@@ -139,7 +137,7 @@ export function OriginalTextView({
     const containerRect = contentRef.current.getBoundingClientRect();
     const scrollTop = contentRef.current.scrollTop;
 
-    const plainContent = originalContent.replace(/[#*_`~\[\]()>-]/g, '');
+    const plainContent = originalContent.replace(/[#*_`~[\]()>-]/g, '');
     let startOffset = plainContent.indexOf(selectedText);
 
     if (startOffset === -1) {
@@ -306,7 +304,7 @@ export function OriginalTextView({
       );
     }
 
-    const plainContent = originalContent.replace(/[#*_`~\[\]()>-]/g, '');
+    const plainContent = originalContent.replace(/[#*_`~[\]()>-]/g, '');
     const allMarkers: { offset: number; type: 'start' | 'end'; annotation?: ArticleTextAnnotation; qaRange?: QARange }[] = [];
 
     for (const ann of annotations) {

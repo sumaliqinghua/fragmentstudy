@@ -137,6 +137,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
     const handleProgressUpdate = (event: Event) => {
       const detail = (event as CustomEvent<{ articleId?: string; progress?: LearningProgress | null }>).detail;
       if (!detail?.articleId || detail.articleId !== articleId) return;
+      if (detail.progress?.mode && detail.progress.mode !== 'card') return;
       if (detail.progress !== undefined) {
         setProgress(detail.progress ?? null);
       } else {
@@ -317,7 +318,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
         <section className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs text-slate-400">学习进度</p>
+              <p className="text-xs text-slate-400">已经接触</p>
               <p className="text-lg font-semibold text-slate-800 mt-1">
                 {progress?.current_index !== undefined ? progress.current_index + 1 : 0} / {cardCount}
               </p>
@@ -333,7 +334,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
                 onClick={() => onOpenMode('card')}
                 className="flex-1 py-3 bg-primary text-white rounded-2xl font-semibold shadow-[0_4px_0_0_#46a302] active:translate-y-1"
               >
-                继续学习
+                继续看看
               </button>
             ) : (
               <button
@@ -355,8 +356,8 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-800">模式入口</h2>
-            <span className="text-xs text-slate-400">点击进入或生成</span>
+            <h2 className="text-base font-semibold text-slate-800">换一种方式看</h2>
+            <span className="text-xs text-slate-400">内容仍来自同一份资料</span>
           </div>
           <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4 touch-pan-x">
             <button
@@ -375,7 +376,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
               className="flex-shrink-0 w-44 bg-white rounded-2xl border border-slate-100 p-4 text-left shadow-sm"
             >
               <HelpCircle className="w-6 h-6 text-violet-600" />
-              <p className="mt-3 text-sm font-semibold text-slate-800">问答模式</p>
+              <p className="mt-3 text-sm font-semibold text-slate-800">随手测一下</p>
               <p className="text-xs text-slate-400 mt-1">{quizCount > 0 ? `${quizCount} 道题目` : '未生成'}</p>
               <span className="mt-3 inline-flex text-xs font-semibold text-violet-600">
                 {quizCount > 0 ? '进入' : '生成'}
@@ -467,7 +468,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
                 取消
               </button>
               <button
-                onClick={() => handleGenerateDialogue(characterModal.mode)}
+                onClick={() => characterModal.mode && handleGenerateDialogue(characterModal.mode)}
                 disabled={isGenerating || !characters.trim()}
                 className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-300"
               >

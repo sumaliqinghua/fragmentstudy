@@ -130,7 +130,7 @@ export function CardStack({
     }
   };
 
-  const handleEdgeTouchStart = useCallback((direction: 'left' | 'right') => {
+  const handleEdgeTouchStart = useCallback(() => {
     longPressTimer.current = setTimeout(() => {
       onLongPress();
     }, 500);
@@ -246,7 +246,7 @@ export function CardStack({
       >
         {prevCard && (
           <button
-            onTouchStart={() => handleEdgeTouchStart('left')}
+            onTouchStart={handleEdgeTouchStart}
             onTouchEnd={() => handleEdgeTouchEnd('left')}
             onTouchCancel={handleEdgeTouchCancel}
             onClick={onPrev}
@@ -258,7 +258,7 @@ export function CardStack({
 
         {nextCard && (
           <button
-            onTouchStart={() => handleEdgeTouchStart('right')}
+            onTouchStart={handleEdgeTouchStart}
             onTouchEnd={() => handleEdgeTouchEnd('right')}
             onTouchCancel={handleEdgeTouchCancel}
             onClick={onNext}

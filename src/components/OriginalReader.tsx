@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Sparkles, Highlighter, Underline, Bold } from 'lucide-react';
 import type { Article, ArticleTextAnnotation } from '../types';
 import { createArticleTextAnnotation, getArticleTextAnnotations } from '../services/dataService';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface OriginalReaderProps {
   article: Article;
@@ -20,9 +21,20 @@ export function OriginalReader({ article, onStartQuiz, onScrollProgress }: Origi
   const contentRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
+  const firstImage = useMemo(() => {
+    const match = article.original_content.match(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/);
+    return match ? { markdown: match[0], url: match[1] } : null;
+  }, [article.original_content]);
+  const readerContent = useMemo(
+    () => firstImage ? article.original_content.replace(firstImage.markdown, '') : article.original_content,
+    [article.original_content, firstImage]
+  );
   const plainContent = useMemo(
-    () => article.original_content.replace(/[#*_`~\[\]()>-]/g, ''),
-    [article.original_content]
+    () => readerContent
+      .replace(/!\[([^\]]*)\]\(https?:\/\/[^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1')
+      .replace(/[#*_`~[\]()>-]/g, ''),
+    [readerContent]
   );
 
   useEffect(() => {
@@ -202,8 +214,12 @@ export function OriginalReader({ article, onStartQuiz, onScrollProgress }: Origi
   return (
     <div className="px-6 pb-24 max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
       <div className="mb-8">
-        <div className="w-full h-52 rounded-2xl overflow-hidden mb-6 shadow-sm border border-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-200 flex items-center justify-center">
-          <BookOpen className="w-16 h-16 text-slate-300" />
+        <div className="w-full h-52 rounded-2xl overflow-hidden mb-6 shadow-sm border border-slate-100 bg-slate-100 flex items-center justify-center">
+          {firstImage ? (
+            <img src={firstImage.url} alt={article.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+          ) : (
+            <BookOpen className="w-16 h-16 text-slate-300" />
+          )}
         </div>
         <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-slate-900 mb-4 font-display">
           {article.title}
@@ -226,8 +242,12 @@ export function OriginalReader({ article, onStartQuiz, onScrollProgress }: Origi
         onMouseUp={handleTextSelection}
         onTouchEnd={handleTextSelection}
       >
-        <div className="text-[20px] leading-[1.8] text-slate-700 whitespace-pre-wrap">
-          {renderAnnotatedContent()}
+        <div className="text-[20px] leading-[1.8] text-slate-700">
+          {annotations.length === 0 ? (
+            <MarkdownRenderer content={readerContent} className="original-markdown" />
+          ) : (
+            <div className="whitespace-pre-wrap">{renderAnnotatedContent()}</div>
+          )}
         </div>
 
         <div className="mt-12 mb-8 p-6 rounded-2xl bg-slate-50 border-2 border-slate-100">

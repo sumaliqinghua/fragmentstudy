@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, MessageCircle, ChevronRight, X, Send, Loader2, FileText } from 'lucide-react';
 import type { Article, DialogueMessage, DialogueQA } from '../types';
-import { getDialogueMessages, getDialogueQAs, saveDialogueQA, upsertProgress } from '../services/dataService';
+import { getDialogueMessages, getDialogueQAs, getProgress, saveDialogueQA, upsertProgress } from '../services/dataService';
 import { answerDialogueQuestion } from '../services/openai';
 import { isConfigured } from '../services/openai';
 import { OriginalTextView } from './OriginalTextView';
@@ -43,6 +43,8 @@ export function DialogueReader({ article, onBack, embedded = false }: DialogueRe
   const [showOriginalText, setShowOriginalText] = useState(false);
   const [characterPortraits, setCharacterPortraits] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const lastSavedIndexRef = useRef(-1);
   const qaPanelRef = useRef<HTMLDivElement>(null);
   const characterPortraitStorageKey = 'galgame_character_portraits_global';
 
@@ -81,25 +83,37 @@ export function DialogueReader({ article, onBack, embedded = false }: DialogueRe
     };
   }, [characterPortraitStorageKey]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      upsertProgress(article.id, messages.length - 1, messages.length);
-    }
-  }, [messages.length, article.id]);
-
   const loadData = async () => {
     try {
-      const [messagesData, qasData] = await Promise.all([
+      const [messagesData, qasData, savedProgress] = await Promise.all([
         getDialogueMessages(article.id),
         getDialogueQAs(article.id),
+        getProgress(article.id, 'dialogue'),
       ]);
       setMessages(messagesData);
       setQAs(qasData);
+      lastSavedIndexRef.current = savedProgress?.current_index ?? -1;
+      window.requestAnimationFrame(() => {
+        const target = messageListRef.current?.querySelector<HTMLElement>(
+          `[data-message-index="${savedProgress?.current_index ?? 0}"]`
+        );
+        target?.scrollIntoView({ block: 'center' });
+      });
     } catch (error) {
       console.error('Failed to load dialogue:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleMessageScroll = () => {
+    const container = messageListRef.current;
+    if (!container || messages.length === 0) return;
+    const visibleRatio = Math.min(1, (container.scrollTop + container.clientHeight) / container.scrollHeight);
+    const visibleIndex = Math.max(0, Math.min(messages.length - 1, Math.ceil(visibleRatio * messages.length) - 1));
+    if (visibleIndex <= lastSavedIndexRef.current) return;
+    lastSavedIndexRef.current = visibleIndex;
+    void upsertProgress(article.id, visibleIndex, messages.length, 'dialogue');
   };
 
   const handleLongPressStart = useCallback((message: DialogueMessage) => {
@@ -222,14 +236,18 @@ export function DialogueReader({ article, onBack, embedded = false }: DialogueRe
           </header>
         )}
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        <div
+          ref={messageListRef}
+          onScroll={handleMessageScroll}
+          className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+        >
           <div className="text-center py-2">
             <span className="inline-block px-3 py-1 bg-gray-200 rounded-full text-xs text-gray-500">
               长按气泡可以向 AI 提问
             </span>
           </div>
 
-          {messages.map((message) => {
+          {messages.map((message, messageIndex) => {
             const isRight = message.is_right_side;
             const avatarColor = generateAvatarColor(message.avatar_seed);
             const isPressed = pressedMessageId === message.id;
@@ -238,6 +256,7 @@ export function DialogueReader({ article, onBack, embedded = false }: DialogueRe
             return (
               <div
                 key={message.id}
+                data-message-index={messageIndex}
                 className={`flex gap-2 ${isRight ? 'flex-row-reverse' : ''}`}
               >
                 <div

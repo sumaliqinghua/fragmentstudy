@@ -4,7 +4,6 @@ interface MarkdownRendererProps {
   content: string;
   className?: string;
   highlightText?: string;
-  highlightRef?: React.RefObject<HTMLSpanElement>;
 }
 
 function escapeHtml(text: string): string {
@@ -16,8 +15,27 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function sanitizeImageUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseInline(text: string): string {
-  let result = escapeHtml(text);
+  const images: string[] = [];
+  const withImageTokens = text.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (_match, alt: string, rawUrl: string) => {
+    const url = sanitizeImageUrl(rawUrl);
+    if (!url) return alt;
+    const token = `FRAGMENTARTICLEIMAGETOKEN${images.length}ZXQEND`;
+    images.push(
+      `<img src="${escapeHtml(url)}" alt="${escapeHtml(alt || '资料图片')}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="block w-full max-h-[32rem] object-contain rounded-lg border border-slate-100 bg-slate-50 my-4" />`
+    );
+    return token;
+  });
+  let result = escapeHtml(withImageTokens);
 
   result = result.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold">$1</strong>');
   result = result.replace(/\*(.+?)\*/g, '<em class="italic">$1</em>');
@@ -25,6 +43,7 @@ function parseInline(text: string): string {
   result = result.replace(/_(.+?)_/g, '<em class="italic">$1</em>');
   result = result.replace(/`(.+?)`/g, '<code class="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>');
   result = result.replace(/~~(.+?)~~/g, '<del class="line-through text-gray-500">$1</del>');
+  result = result.replace(/FRAGMENTARTICLEIMAGETOKEN(\d+)ZXQEND/g, (_match, index: string) => images[Number(index)] || '');
 
   return result;
 }
@@ -104,7 +123,7 @@ function parseMarkdown(content: string): string {
       continue;
     }
 
-    const unorderedMatch = line.match(/^[\-\*]\s+(.+)$/);
+    const unorderedMatch = line.match(/^[-*]\s+(.+)$/);
     if (unorderedMatch) {
       if (inList && inOrderedList) {
         flushList();
@@ -144,7 +163,7 @@ function parseMarkdown(content: string): string {
   return result.join('');
 }
 
-export function MarkdownRenderer({ content, className = '', highlightText, highlightRef }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className = '', highlightText }: MarkdownRendererProps) {
   const html = useMemo(() => {
     let parsed = parseMarkdown(content);
 

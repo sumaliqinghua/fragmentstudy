@@ -1,7 +1,7 @@
 import type { Card, LearningProgress, QuizQuestion } from '../types';
 
 export type PathNodeType = 'card' | 'quiz' | 'chest';
-export type PathNodeStatus = 'completed' | 'current' | 'locked';
+export type PathNodeStatus = 'seen' | 'current' | 'available';
 
 export interface PathNode {
   id: string;
@@ -45,8 +45,8 @@ export function generateLearningPath(options: GeneratePathOptions): PathNode[] {
     return {
       id: `card-${index}`,
       type: 'card',
-      status: 'locked',
-      label: `Card ${start + 1}-${end + 1}`,
+      status: 'available',
+      label: `第 ${index + 1} 小节 · ${group.length <= 3 ? '约 2 分钟' : '约 3 分钟'}`,
       cardIds: group.map((card) => card.id),
       cardRange: [start, end],
     };
@@ -59,8 +59,8 @@ export function generateLearningPath(options: GeneratePathOptions): PathNode[] {
     return {
       id: `quiz-${index}`,
       type: 'quiz',
-      status: 'locked',
-      label: `Quiz ${start}${group.length > 1 ? `-${end}` : ''}`,
+      status: 'available',
+      label: `随手测 ${start}${group.length > 1 ? `-${end}` : ''}`,
       quizIds: group.map((quiz) => quiz.id),
     };
   });
@@ -88,8 +88,8 @@ export function generateLearningPath(options: GeneratePathOptions): PathNode[] {
       combined.splice(position, 0, {
         id: `chest-${milestone}`,
         type: 'chest',
-        status: 'locked',
-        label: `${milestone}% Chest`,
+        status: 'available',
+        label: `${milestone}% 小礼物`,
         milestone,
         claimed: claimedMilestones.includes(milestone),
       });
@@ -106,10 +106,10 @@ export function generateLearningPath(options: GeneratePathOptions): PathNode[] {
   }
 
   return combined.map((node, index) => {
-    let status: PathNodeStatus = 'locked';
-    if (index < currentNodeIndex) status = 'completed';
+    let status: PathNodeStatus = 'available';
+    if (index < currentNodeIndex) status = 'seen';
     if (index === currentNodeIndex) status = 'current';
-    if (node.type === 'chest' && node.claimed) status = 'completed';
+    if (node.type === 'chest' && node.claimed) status = 'seen';
     return { ...node, status };
   });
 }

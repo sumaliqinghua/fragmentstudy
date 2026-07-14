@@ -26,7 +26,7 @@ function getProxyUrl(): string {
 }
 
 export function getOpenAIConfig(): OpenAIConfig {
-  const envApiKey = import.meta.env.VITE_QINIU_API_KEY || import.meta.env.QINIU_API_KEY || '';
+  const envApiKey = import.meta.env.DEV ? '' : (import.meta.env.VITE_QINIU_API_KEY || '');
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     const config = JSON.parse(stored) as Partial<OpenAIConfig>;
@@ -49,7 +49,7 @@ export function saveOpenAIConfig(config: OpenAIConfig): void {
 
 export function isConfigured(): boolean {
   const config = getOpenAIConfig();
-  return !!config.apiKey && !!config.apiEndpoint;
+  return (!!config.apiKey || Boolean(import.meta.env.VITE_LOCAL_AI_CONFIGURED)) && !!config.apiEndpoint;
 }
 
 type OpenAIResponseFormat = {
@@ -69,11 +69,11 @@ type OpenAIResponseFormat = {
 async function callOpenAI(
   messages: { role: string; content: string }[],
   stream = false,
-  responseFormat?: OpenAIResponseFormat
+  responseFormat?: OpenAIResponseFormat | null
 ): Promise<Response> {
   const config = getOpenAIConfig();
 
-  if (!config.apiKey) {
+  if (!config.apiKey && !import.meta.env.VITE_LOCAL_AI_CONFIGURED) {
     throw new Error('请先配置 API Key');
   }
 
@@ -92,7 +92,7 @@ async function callOpenAI(
           },
         },
       };
-  const finalResponseFormat = responseFormat ?? defaultArrayFormat;
+  const finalResponseFormat = responseFormat === null ? undefined : (responseFormat ?? defaultArrayFormat);
 
   const response = await fetch(getProxyUrl(), {
     method: 'POST',
@@ -112,8 +112,9 @@ async function callOpenAI(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || `API 请求失败: ${response.status}`);
+    const error = await response.json().catch(() => ({})) as { error?: string | { message?: string } };
+    const message = typeof error.error === 'string' ? error.error : error.error?.message;
+    throw new Error(message || `API 请求失败: ${response.status}`);
   }
 
   return response;
@@ -137,7 +138,7 @@ function parseJsonArray<T>(resultText: string): T[] {
 
   try {
     return JSON.parse(jsonMatch[0]);
-  } catch (error) {
+  } catch {
     throw new AIResponseParseError('AI 返回的 JSON 无法解析，请复制后手动修正', cleanedText || resultText);
   }
 }
@@ -163,12 +164,27 @@ export async function splitArticle(content: string): Promise<CardSplitResult[]> 
   const response = await callOpenAI([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: `请将以下文章拆分成学习卡片：\n\n${content}` },
-  ]);
+  ], false, null);
 
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  return parseJsonArray<CardSplitResult>(resultText);
+  const rawCards = parseJsonArray<Partial<CardSplitResult> & {
+    text?: string;
+    label?: string;
+    context?: string;
+  }>(resultText);
+  const cards = rawCards
+    .map(card => ({
+      content: String(card.content || card.text || '').trim(),
+      semantic_label: String(card.semantic_label || card.label || '知识片段').trim(),
+      context_summary: String(card.context_summary || card.context || '来自当前资料').trim(),
+    }))
+    .filter(card => card.content.length > 0);
+  if (cards.length === 0) {
+    throw new AIResponseParseError('AI 没有返回有效卡片内容，请重试', resultText);
+  }
+  return cards;
 }
 
 const questionTypePrompts: Record<string, string> = {
@@ -180,7 +196,7 @@ const questionTypePrompts: Record<string, string> = {
 export async function* explainCard(request: AIExplanationRequest): AsyncGenerator<string> {
   const { cardContent, previousCards, questionType, customQuestion } = request;
 
-  let userQuestion = questionTypePrompts[questionType] || customQuestion || '请解释这张卡片的内容';
+  const userQuestion = questionTypePrompts[questionType] || customQuestion || '请解释这张卡片的内容';
 
   let contextInfo = '';
   if (previousCards.length > 0 && questionType === 'connect') {
@@ -244,6 +260,48 @@ export async function* explainCard(request: AIExplanationRequest): AsyncGenerato
   }
 }
 
+function getCharacterNames(characters: string): string[] {
+  return characters
+    .split(/(?:和|与|、|，|,|\n|\/)/)
+    .map(name => name.trim())
+    .filter(Boolean);
+}
+
+function getString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function getDialogueSide(value: unknown, characterName: string, names: string[], index: number): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', 'right', '右', '右侧'].includes(normalized)) return true;
+    if (['false', 'left', '左', '左侧'].includes(normalized)) return false;
+  }
+  return names[1] ? characterName === names[1] : index % 2 === 1;
+}
+
+function flattenGeneratedMessages(value: unknown, depth = 0): Record<string, unknown>[] {
+  if (depth > 4) return [];
+  if (Array.isArray(value)) {
+    return value.flatMap(item => flattenGeneratedMessages(item, depth + 1));
+  }
+  if (!value || typeof value !== 'object') return [];
+
+  const item = value as Record<string, unknown>;
+  if (getString(item.content ?? item.text ?? item.message ?? item.dialogue)) {
+    return [item];
+  }
+  const nestedKeys = ['characters', 'messages', 'dialogues', 'lines', 'scenes', 'items', 'rows'];
+  for (const key of nestedKeys) {
+    if (Array.isArray(item[key])) {
+      const nested = flattenGeneratedMessages(item[key], depth + 1);
+      if (nested.length > 0) return nested;
+    }
+  }
+  return [];
+}
+
 export async function convertToDialogue(content: string, characters: string): Promise<DialogueGenerationResult[]> {
   const systemPrompt = `你是一个创意内容转换专家。你的任务是将教育内容转换成角色对话的形式，类似欧姆社学习漫画的风格。
 
@@ -276,10 +334,30 @@ export async function convertToDialogue(content: string, characters: string): Pr
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  const result = parseJsonArray<DialogueGenerationResult>(resultText);
-  const missingSeed = result.find((item) => !item.avatar_seed || item.avatar_seed.trim().length === 0);
-  if (missingSeed) {
-    throw new AIResponseParseError('AI 返回缺少 avatar_seed，请重试', resultText);
+  const names = getCharacterNames(characters);
+  const rawResult = flattenGeneratedMessages(parseJsonArray<unknown>(resultText));
+  const result = rawResult
+    .map((item, index) => {
+      const characterName = getString(
+        item.character_name ?? item.character ?? item.speaker ?? item.name
+      ) || names[index % Math.max(1, names.length)] || `角色 ${index + 1}`;
+      const messageContent = getString(item.content ?? item.text ?? item.message ?? item.dialogue);
+      return {
+        character_name: characterName,
+        avatar_seed: getString(item.avatar_seed ?? item.avatarSeed ?? item.avatar) || characterName,
+        content: messageContent,
+        is_right_side: getDialogueSide(
+          item.is_right_side ?? item.isRightSide ?? item.side ?? item.position,
+          characterName,
+          names,
+          index
+        ),
+        knowledge_point: getString(item.knowledge_point ?? item.knowledgePoint ?? item.knowledge) || undefined,
+      } satisfies DialogueGenerationResult;
+    })
+    .filter(item => item.content.length > 0);
+  if (result.length === 0) {
+    throw new AIResponseParseError('AI 没有返回有效对话内容，请重试', resultText);
   }
   return result;
 }
@@ -462,10 +540,36 @@ export async function convertToGalgame(content: string, characters: string): Pro
   const data = await response.json();
   const resultText = data.choices[0]?.message?.content || '[]';
 
-  const result = parseJsonArray<GalgameGenerationResult>(resultText);
-  const missingSeed = result.find((item) => !item.avatar_seed || item.avatar_seed.trim().length === 0);
-  if (missingSeed) {
-    throw new AIResponseParseError('AI 返回缺少 avatar_seed，请重试', resultText);
+  const names = getCharacterNames(characters);
+  const rawResult = flattenGeneratedMessages(parseJsonArray<unknown>(resultText));
+  const result = rawResult
+    .map((item, index) => {
+      const characterName = getString(
+        item.character_name ?? item.character ?? item.speaker ?? item.name
+      ) || names[index % Math.max(1, names.length)] || `角色 ${index + 1}`;
+      const rawPosition = getString(item.position ?? item.side).toLowerCase();
+      const position = ['left', 'right', 'center'].includes(rawPosition)
+        ? rawPosition as 'left' | 'right' | 'center'
+        : names[1] && characterName === names[1]
+          ? 'right'
+          : 'left';
+      const rawScreenEffect = getString(item.screen_effect ?? item.screenEffect).toLowerCase();
+      const screenEffect = ['none', 'shake', 'flash', 'pulse'].includes(rawScreenEffect)
+        ? rawScreenEffect as NonNullable<GalgameGenerationResult['screen_effect']>
+        : undefined;
+      return {
+        character_name: characterName,
+        avatar_seed: getString(item.avatar_seed ?? item.avatarSeed ?? item.avatar) || characterName,
+        content: getString(item.content ?? item.text ?? item.message ?? item.dialogue),
+        emotion_emoji: getString(item.emotion_emoji ?? item.emotionEmoji ?? item.emotion) || undefined,
+        screen_effect: screenEffect,
+        knowledge_point: getString(item.knowledge_point ?? item.knowledgePoint ?? item.knowledge) || undefined,
+        position,
+      } satisfies GalgameGenerationResult;
+    })
+    .filter(item => item.content.length > 0);
+  if (result.length === 0) {
+    throw new AIResponseParseError('AI 没有返回有效视觉小说内容，请重试', resultText);
   }
   return result;
 }

@@ -28,7 +28,7 @@ export function StreakModal({ isOpen, streakDays, onClose }: StreakModalProps) {
             <Flame className="w-12 h-12 text-white" />
           </div>
           <h3 className="text-2xl font-bold mb-2">连胜 {streakDays} 天</h3>
-          <p className="text-sm text-white/80 mb-6">保持节奏，完成今天的学习目标</p>
+          <p className="text-sm text-white/80 mb-6">今天接触一点内容，就已经算在前进</p>
 
           <div className="grid grid-cols-7 gap-2 mb-6">
             {DAYS.map((day) => {
@@ -52,7 +52,7 @@ export function StreakModal({ isOpen, streakDays, onClose }: StreakModalProps) {
             onClick={onClose}
             className="w-full py-3 bg-white text-orange-500 rounded-2xl font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
           >
-            继续学习
+            继续看看
           </button>
         </div>
       </div>

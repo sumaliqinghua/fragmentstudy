@@ -1,4 +1,6 @@
 export type ArticleMode = 'source' | 'card' | 'dialogue' | 'galgame';
+export type SourceType = 'text' | 'pdf' | 'url' | 'ai';
+export type LearningMode = 'card' | 'dialogue' | 'galgame';
 
 export type ScreenEffect = 'none' | 'shake' | 'flash' | 'pulse';
 export type CharacterPosition = 'left' | 'right' | 'center';
@@ -9,6 +11,9 @@ export interface Article {
   original_content: string;
   mode: ArticleMode;
   characters?: string;
+  subject_id?: string | null;
+  source_type?: SourceType;
+  source_url?: string | null;
   tagIds?: string[];
   created_at: string;
 }
@@ -26,10 +31,23 @@ export interface Card {
 export interface LearningProgress {
   id: string;
   article_id: string;
+  mode: LearningMode;
   current_index: number;
   completed_count: number;
   total_count: number;
   last_read_at: string;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface ArticleSourceMetadata {
+  subjectId?: string | null;
+  sourceType?: SourceType;
+  sourceUrl?: string | null;
 }
 
 export interface Reward {
