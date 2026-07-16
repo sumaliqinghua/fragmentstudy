@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { isSupabaseConfigured, supabase } from './supabase';
 import * as guestStorage from './guestStorage';
 import type {
   Article,
@@ -158,6 +158,7 @@ export function getRewardsCacheSnapshot(articleId: string): Reward[] | undefined
 }
 
 async function getUserId(): Promise<string | null> {
+  if (!isSupabaseConfigured) return null;
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
 }
@@ -167,7 +168,28 @@ async function isAuthenticated(): Promise<boolean> {
   return userId !== null;
 }
 
+async function requireUserId(): Promise<string> {
+  const userId = await getUserId();
+  if (!userId) throw new Error('登录状态已失效，请重新登录。');
+  return userId;
+}
+
 const missingTables = new Set<string>();
+
+export function resetDataServiceState(): void {
+  cache.articles = null;
+  cache.articlesById.clear();
+  cache.tags = null;
+  cache.subjects = null;
+  cache.articleTagsByArticleId.clear();
+  cache.cardsByArticleId.clear();
+  cache.progressByArticleId.clear();
+  cache.rewardsByArticleId.clear();
+  cache.dialogueByArticleId.clear();
+  cache.galgameByArticleId.clear();
+  cache.quizByArticleId.clear();
+  missingTables.clear();
+}
 
 function isMissingTableError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -176,6 +198,18 @@ function isMissingTableError(error: unknown): boolean {
   if (err.status === 404) return true;
   if (err.message && err.message.includes('Could not find the table')) return true;
   return false;
+}
+
+function migrationRequired(table: string, cause?: unknown): Error {
+  const error = new Error(`Supabase 数据表 ${table} 不存在，请先执行数据库迁移。`);
+  if (cause !== undefined) {
+    (error as Error & { cause?: unknown }).cause = cause;
+  }
+  return error;
+}
+
+function requireTableAvailable(table: string): void {
+  if (missingTables.has(table)) throw migrationRequired(table);
 }
 
 function buildCountMap(articleIds: string[], rows: Array<{ article_id: string }> | null | undefined): Map<string, number> {
@@ -191,9 +225,7 @@ function buildCountMap(articleIds: string[], rows: Array<{ article_id: string }>
 
 async function getArticleCountMap(table: string, articleIds: string[]): Promise<Map<string, number>> {
   if (articleIds.length === 0) return new Map();
-  if (missingTables.has(table)) {
-    return buildCountMap(articleIds, []);
-  }
+  requireTableAvailable(table);
 
   const { data, error } = await supabase
     .from(table)
@@ -203,7 +235,7 @@ async function getArticleCountMap(table: string, articleIds: string[]): Promise<
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add(table);
-      return buildCountMap(articleIds, []);
+      throw migrationRequired(table, error);
     }
     throw error;
   }
@@ -212,7 +244,7 @@ async function getArticleCountMap(table: string, articleIds: string[]): Promise<
 
 async function getProgressMapForArticles(articleIds: string[]): Promise<Map<string, LearningProgress>> {
   if (articleIds.length === 0) return new Map();
-  if (missingTables.has('learning_progress')) return new Map();
+  requireTableAvailable('learning_progress');
 
   const { data, error } = await supabase
     .from('learning_progress')
@@ -223,7 +255,7 @@ async function getProgressMapForArticles(articleIds: string[]): Promise<Map<stri
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('learning_progress');
-      return new Map();
+      throw migrationRequired('learning_progress', error);
     }
     throw error;
   }
@@ -242,13 +274,7 @@ async function getArticleTagsForArticles(articleIds: string[]): Promise<Map<stri
     return guestStorage.getArticleTagsForArticles(articleIds);
   }
 
-  if (missingTables.has('article_tags')) {
-    const empty = new Map<string, string[]>();
-    for (const articleId of articleIds) {
-      empty.set(articleId, []);
-    }
-    return empty;
-  }
+  requireTableAvailable('article_tags');
 
   const { data, error } = await supabase
     .from('article_tags')
@@ -258,11 +284,7 @@ async function getArticleTagsForArticles(articleIds: string[]): Promise<Map<stri
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('article_tags');
-      const empty = new Map<string, string[]>();
-      for (const articleId of articleIds) {
-        empty.set(articleId, []);
-      }
-      return empty;
+      throw migrationRequired('article_tags', error);
     }
     throw error;
   }
@@ -412,7 +434,7 @@ export async function createArticle(
     return guestStorage.createArticle(title, content, mode, characters, metadata);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('articles')
     .insert({
@@ -461,7 +483,7 @@ export async function getSubjects(): Promise<Subject[]> {
   if (!(await isAuthenticated())) {
     return guestStorage.getSubjects();
   }
-  if (missingTables.has('subjects')) return [];
+  requireTableAvailable('subjects');
   if (isFresh(cache.subjects)) return cache.subjects.data;
 
   const { data, error } = await supabase
@@ -471,7 +493,7 @@ export async function getSubjects(): Promise<Subject[]> {
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('subjects');
-      return [];
+      throw migrationRequired('subjects', error);
     }
     throw error;
   }
@@ -493,7 +515,7 @@ export async function createSubject(name: string): Promise<Subject> {
     subject => subject.name.toLowerCase() === normalized.toLowerCase()
   );
   if (existing) return existing;
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('subjects')
     .insert({ name: normalized, user_id: userId })
@@ -502,7 +524,7 @@ export async function createSubject(name: string): Promise<Subject> {
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('subjects');
-      throw new Error('科目表未创建，请先执行 Supabase 迁移。');
+      throw migrationRequired('subjects', error);
     }
     throw error;
   }
@@ -515,9 +537,7 @@ export async function getTags(): Promise<Tag[]> {
     return guestStorage.getTags();
   }
 
-  if (missingTables.has('tags')) {
-    return [];
-  }
+  requireTableAvailable('tags');
 
   if (isFresh(cache.tags)) {
     return cache.tags.data;
@@ -531,7 +551,7 @@ export async function getTags(): Promise<Tag[]> {
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('tags');
-      return [];
+      throw migrationRequired('tags', error);
     }
     throw error;
   }
@@ -547,11 +567,9 @@ export async function createTag(name: string, parentId: string | null): Promise<
     return tag;
   }
 
-  if (missingTables.has('tags')) {
-    throw new Error('标签表未创建，请先执行 Supabase 迁移。');
-  }
+  requireTableAvailable('tags');
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('tags')
     .insert({ name, parent_id: parentId, user_id: userId })
@@ -561,7 +579,7 @@ export async function createTag(name: string, parentId: string | null): Promise<
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('tags');
-      throw new Error('标签表未创建，请先执行 Supabase 迁移。');
+      throw migrationRequired('tags', error);
     }
     throw error;
   }
@@ -607,12 +625,15 @@ export async function setArticleTags(articleId: string, tagIds: string[]): Promi
     return;
   }
 
-  if (missingTables.has('article_tags')) return;
+  requireTableAvailable('article_tags');
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { error: deleteError } = await supabase.from('article_tags').delete().eq('article_id', articleId);
   if (deleteError) {
-    if (isMissingTableError(deleteError)) return;
+    if (isMissingTableError(deleteError)) {
+      missingTables.add('article_tags');
+      throw migrationRequired('article_tags', deleteError);
+    }
     throw deleteError;
   }
 
@@ -624,7 +645,10 @@ export async function setArticleTags(articleId: string, tagIds: string[]): Promi
     }));
     const { error } = await supabase.from('article_tags').insert(rows);
     if (error) {
-      if (isMissingTableError(error)) return;
+      if (isMissingTableError(error)) {
+        missingTables.add('article_tags');
+        throw migrationRequired('article_tags', error);
+      }
       throw error;
     }
   }
@@ -722,7 +746,7 @@ export async function upsertProgress(
     return result;
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const completedCount = currentIndex + 1;
 
   const { data, error } = await supabase
@@ -776,7 +800,7 @@ export async function claimReward(
     return guestStorage.claimReward(articleId, milestone);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const points = Math.floor(Math.random() * 41) + 10;
 
   const { data, error } = await supabase
@@ -840,7 +864,7 @@ export async function toggleBookmark(cardId: string): Promise<boolean> {
     return guestStorage.toggleBookmark(cardId);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
 
   const { data: existing } = await supabase
     .from('bookmarks')
@@ -906,7 +930,7 @@ export async function saveConversation(
     return guestStorage.saveConversation(cardId, questionType, question, answer);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('ai_conversations')
     .insert({ card_id: cardId, question_type: questionType, question, answer, user_id: userId })
@@ -975,7 +999,7 @@ export async function createHighlight(
     return guestStorage.createHighlight(cardId, text, startOffset, endOffset, style, color);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('highlights')
     .insert({
@@ -1101,7 +1125,7 @@ export async function saveDialogueQA(
     return guestStorage.saveDialogueQA(messageId, articleId, question, answer, contextUpTo);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('dialogue_qa')
     .insert({
@@ -1167,7 +1191,7 @@ export async function upsertCardNote(cardId: string, content: string): Promise<C
     return guestStorage.upsertCardNote(cardId, content);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('card_notes')
     .upsert({
@@ -1212,9 +1236,7 @@ export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[
     return guestStorage.getQuizQuestions(articleId);
   }
 
-  if (missingTables.has('quiz_questions')) {
-    return [];
-  }
+  requireTableAvailable('quiz_questions');
 
   const cached = getCacheEntry(cache.quizByArticleId, articleId);
   if (cached) {
@@ -1230,9 +1252,7 @@ export async function getQuizQuestions(articleId: string): Promise<QuizQuestion[
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('quiz_questions');
-      const result: QuizQuestion[] = [];
-      setCacheEntry(cache.quizByArticleId, articleId, result);
-      return result;
+      throw migrationRequired('quiz_questions', error);
     }
     throw error;
   }
@@ -1282,9 +1302,7 @@ export async function createQuizQuestions(
     return guestStorage.createQuizQuestions(articleId, questions);
   }
 
-  if (missingTables.has('quiz_questions')) {
-    throw new Error('题库表未创建，请先执行 Supabase 迁移。');
-  }
+  requireTableAvailable('quiz_questions');
 
   const questionsToInsert = questions.map((question, index) => ({
     ...question,
@@ -1300,7 +1318,7 @@ export async function createQuizQuestions(
   if (error) {
     if (isMissingTableError(error)) {
       missingTables.add('quiz_questions');
-      throw new Error('题库表未创建，请先执行 Supabase 迁移。');
+      throw migrationRequired('quiz_questions', error);
     }
     throw error;
   }
@@ -1338,7 +1356,7 @@ export async function createArticleTextAnnotation(
     return guestStorage.createArticleTextAnnotation(articleId, text, startOffset, endOffset, style, color);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('article_text_annotations')
     .insert({
@@ -1419,7 +1437,7 @@ export async function saveArticleTextQA(
     return guestStorage.saveArticleTextQA(articleId, selectedText, startOffset, endOffset, question, answer, includeFullArticle);
   }
 
-  const userId = await getUserId();
+  const userId = await requireUserId();
   const { data, error } = await supabase
     .from('article_text_qa')
     .insert({

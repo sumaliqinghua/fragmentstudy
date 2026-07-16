@@ -73,7 +73,7 @@ export function WelcomeModal({ isOpen, onLogin, onRegister, onSkip }: WelcomeMod
           </button>
 
           <p className="text-center text-xs text-gray-400 pt-2">
-            访客数据仅保存在本地，清除浏览器数据后将丢失
+            访客数据仅保留在当前页面，刷新、登录或退出后将清空
           </p>
         </div>
       </div>

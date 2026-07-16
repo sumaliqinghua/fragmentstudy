@@ -1,10 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Article, Card, LearningProgress, Reward, ArticleWithProgress, AIConversation, Highlight, DialogueMessage, DialogueQA, DialogueGenerationResult, ArticleMode, CardNote, GalgameMessage, GalgameGenerationResult, QuizQuestion, QuizGenerationResult } from '../types';
+import { resolveSupabaseConfig } from './supabaseConfig';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseConfig = resolveSupabaseConfig(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const isSupabaseConfigured = supabaseConfig.isConfigured;
+export const supabaseConfigError = supabaseConfig.error;
+
+export const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+  auth: { persistSession: isSupabaseConfigured },
+});
 
 export async function getArticles(): Promise<ArticleWithProgress[]> {
   const { data: articles, error } = await supabase

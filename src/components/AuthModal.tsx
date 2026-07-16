@@ -11,7 +11,7 @@ interface AuthModalProps {
 type AuthMode = 'login' | 'register' | 'reset';
 
 export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { configError, signIn, signUp, resetPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +19,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [registrationSent, setRegistrationSent] = useState(false);
 
   if (!isOpen) return null;
 
@@ -48,13 +49,15 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
           setIsLoading(false);
           return;
         }
-        const { error } = await signUp(email, password);
+        const { error, requiresEmailConfirmation } = await signUp(email, password);
         if (error) {
           if (error.message.includes('already registered')) {
             setError('该邮箱已被注册');
           } else {
             setError(error.message);
           }
+        } else if (requiresEmailConfirmation) {
+          setRegistrationSent(true);
         } else {
           onClose();
         }
@@ -77,6 +80,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
     setMode(newMode);
     setError('');
     setResetSent(false);
+    setRegistrationSent(false);
   };
 
   const getTitle = () => {
@@ -111,7 +115,23 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         </div>
 
         <div className="p-6">
-          {mode === 'reset' && resetSent ? (
+          {mode === 'register' && registrationSent ? (
+            <div className="text-center py-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">确认邮件已发送</h3>
+              <p className="text-gray-600 text-sm">
+                请查收邮箱并完成确认，然后返回登录
+              </p>
+              <button
+                onClick={() => switchMode('login')}
+                className="mt-6 text-teal-600 hover:text-teal-700 font-medium"
+              >
+                返回登录
+              </button>
+            </div>
+          ) : mode === 'reset' && resetSent ? (
             <div className="text-center py-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
@@ -184,15 +204,15 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                 </div>
               )}
 
-              {error && (
+              {(error || configError) && (
                 <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl">
-                  {error}
+                  {error || configError}
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || Boolean(configError)}
                 className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl font-medium hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
               >
                 {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}

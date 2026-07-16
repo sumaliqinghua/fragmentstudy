@@ -25,18 +25,39 @@ import type {
 } from '../types';
 
 const STORAGE_PREFIX = 'guest_';
+const memoryStore = new Map<string, unknown>();
 
 function generateId(): string {
   return crypto.randomUUID();
 }
 
+function cloneValue<T>(value: T): T {
+  return structuredClone(value);
+}
+
 function getItem<T>(key: string): T | null {
-  const item = localStorage.getItem(STORAGE_PREFIX + key);
-  return item ? JSON.parse(item) : null;
+  const item = memoryStore.get(key);
+  return item === undefined ? null : cloneValue(item as T);
 }
 
 function setItem<T>(key: string, value: T): void {
-  localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+  memoryStore.set(key, cloneValue(value));
+}
+
+function removeItem(key: string): void {
+  memoryStore.delete(key);
+}
+
+export function clearGuestData(): void {
+  memoryStore.clear();
+  if (typeof localStorage === 'undefined') return;
+
+  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith(STORAGE_PREFIX)) {
+      localStorage.removeItem(key);
+    }
+  }
 }
 
 function getArticlesStore(): Article[] {
@@ -228,10 +249,10 @@ export async function deleteArticle(id: string): Promise<void> {
   const articles = getArticlesStore();
   setArticlesStore(articles.filter(a => a.id !== id));
 
-  localStorage.removeItem(STORAGE_PREFIX + `cards_${id}`);
-  localStorage.removeItem(STORAGE_PREFIX + `dialogue_${id}`);
-  localStorage.removeItem(STORAGE_PREFIX + `galgame_${id}`);
-  localStorage.removeItem(STORAGE_PREFIX + `quiz_${id}`);
+  removeItem(`cards_${id}`);
+  removeItem(`dialogue_${id}`);
+  removeItem(`galgame_${id}`);
+  removeItem(`quiz_${id}`);
 
   const progressStore = getProgressStore();
   for (const key of Object.keys(progressStore)) {
@@ -652,12 +673,7 @@ export async function createGalgameMessages(
 }
 
 export function clearAllGuestData(): void {
-  const keys = Object.keys(localStorage);
-  for (const key of keys) {
-    if (key.startsWith(STORAGE_PREFIX)) {
-      localStorage.removeItem(key);
-    }
-  }
+  clearGuestData();
 }
 
 function getArticleTextAnnotationsStore(): ArticleTextAnnotation[] {
