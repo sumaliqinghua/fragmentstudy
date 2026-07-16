@@ -50,12 +50,12 @@ function removeItem(key: string): void {
 
 export function clearGuestData(): void {
   memoryStore.clear();
-  if (typeof localStorage === 'undefined') return;
+  if (typeof window === 'undefined') return;
 
-  for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-    const key = localStorage.key(index);
+  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+    const key = window.localStorage.key(index);
     if (key?.startsWith(STORAGE_PREFIX)) {
-      localStorage.removeItem(key);
+      window.localStorage.removeItem(key);
     }
   }
 }
