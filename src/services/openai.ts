@@ -1,10 +1,13 @@
 import type { CardSplitResult, AIExplanationRequest, DialogueGenerationResult, GalgameGenerationResult, QuizGenerationResult } from '../types';
-
-const STORAGE_KEY = 'openai_config';
+import { buildPlatformAIRequest } from './aiRequest';
+import {
+  loadAIModel,
+  resolveAIAvailability,
+  saveAIModel,
+} from './aiConfig';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 interface OpenAIConfig {
-  apiKey: string;
-  apiEndpoint: string;
   model: string;
 }
 
@@ -26,30 +29,18 @@ function getProxyUrl(): string {
 }
 
 export function getOpenAIConfig(): OpenAIConfig {
-  const envApiKey = import.meta.env.DEV ? '' : (import.meta.env.VITE_QINIU_API_KEY || '');
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const config = JSON.parse(stored) as Partial<OpenAIConfig>;
-    return {
-      apiKey: config.apiKey || envApiKey,
-      apiEndpoint: config.apiEndpoint || 'https://api.qnaigc.com/v1',
-      model: config.model || 'qwen/qwen3.7-plus',
-    };
-  }
-  return {
-    apiKey: envApiKey,
-    apiEndpoint: 'https://api.qnaigc.com/v1',
-    model: 'qwen/qwen3.7-plus',
-  };
+  return { model: loadAIModel() };
 }
 
 export function saveOpenAIConfig(config: OpenAIConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  saveAIModel(config.model);
 }
 
 export function isConfigured(): boolean {
-  const config = getOpenAIConfig();
-  return (!!config.apiKey || Boolean(import.meta.env.VITE_LOCAL_AI_CONFIGURED)) && !!config.apiEndpoint;
+  return resolveAIAvailability(
+    import.meta.env.VITE_PLATFORM_AI_ENABLED,
+    Boolean(import.meta.env.VITE_LOCAL_AI_CONFIGURED)
+  );
 }
 
 type OpenAIResponseFormat = {
@@ -71,10 +62,16 @@ async function callOpenAI(
   stream = false,
   responseFormat?: OpenAIResponseFormat | null
 ): Promise<Response> {
-  const config = getOpenAIConfig();
+  if (!isConfigured()) {
+    throw new Error('AI 服务暂未配置');
+  }
+  if (!isSupabaseConfigured) {
+    throw new Error('请先配置 Supabase 并登录后使用 AI 生成功能');
+  }
 
-  if (!config.apiKey && !import.meta.env.VITE_LOCAL_AI_CONFIGURED) {
-    throw new Error('请先配置 API Key');
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session?.access_token) {
+    throw new Error('请先登录后使用 AI 生成功能');
   }
 
   const defaultArrayFormat: OpenAIResponseFormat | undefined = stream
@@ -94,21 +91,19 @@ async function callOpenAI(
       };
   const finalResponseFormat = responseFormat === null ? undefined : (responseFormat ?? defaultArrayFormat);
 
+  const request = buildPlatformAIRequest({
+    accessToken: session.access_token,
+    model: getOpenAIConfig().model,
+    messages,
+    stream,
+    temperature: 0.7,
+    responseFormat: finalResponseFormat,
+  });
+
   const response = await fetch(getProxyUrl(), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      apiKey: config.apiKey,
-      apiEndpoint: config.apiEndpoint,
-      model: config.model,
-      messages,
-      stream,
-      ...(finalResponseFormat ? { response_format: finalResponseFormat } : {}),
-      temperature: 0.7,
-    }),
+    headers: request.headers,
+    body: JSON.stringify(request.body),
   });
 
   if (!response.ok) {
@@ -206,30 +201,10 @@ export async function* explainCard(request: AIExplanationRequest): AsyncGenerato
   const systemPrompt = `你是一个耐心、专业的学习助手。你的任务是帮助用户理解学习卡片中的内容。
 请根据用户的问题类型，给出清晰、易懂的解释。回答应该简洁但完整，避免过于冗长。`;
 
-  const config = getOpenAIConfig();
-
-  const response = await fetch(getProxyUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      apiKey: config.apiKey,
-      apiEndpoint: config.apiEndpoint,
-      model: config.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `当前学习的卡片内容：\n${cardContent}${contextInfo}\n\n我的问题：${userQuestion}` },
-      ],
-      stream: true,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API 请求失败: ${response.status}`);
-  }
+  const response = await callOpenAI([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `当前学习的卡片内容：\n${cardContent}${contextInfo}\n\n我的问题：${userQuestion}` },
+  ], true);
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('无法读取响应');
@@ -373,30 +348,10 @@ export async function* answerDialogueQuestion(
   const systemPrompt = `你是一个学习助手。用户正在通过对话形式学习知识，他们对某段对话有疑问。
 请根据对话上下文，用简洁清晰的语言回答用户的问题。`;
 
-  const config = getOpenAIConfig();
-
-  const response = await fetch(getProxyUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      apiKey: config.apiKey,
-      apiEndpoint: config.apiEndpoint,
-      model: config.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `对话上下文：\n${contextText}\n\n我的问题：${question}` },
-      ],
-      stream: true,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API 请求失败: ${response.status}`);
-  }
+  const response = await callOpenAI([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `对话上下文：\n${contextText}\n\n我的问题：${question}` },
+  ], true);
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('无法读取响应');
@@ -440,30 +395,10 @@ export async function* answerArticleTextQuestion(
 请根据选中的文字和用户的问题，给出清晰、易懂的解释。如果提供了完整文章内容，可以结合上下文来回答。
 回答应该简洁但完整，避免过于冗长。`;
 
-  const config = getOpenAIConfig();
-
-  const response = await fetch(getProxyUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({
-      apiKey: config.apiKey,
-      apiEndpoint: config.apiEndpoint,
-      model: config.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `选中的文字：\n"${selectedText}"${contextSection}\n\n我的问题：${question}` },
-      ],
-      stream: true,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API 请求失败: ${response.status}`);
-  }
+  const response = await callOpenAI([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `选中的文字：\n"${selectedText}"${contextSection}\n\n我的问题：${question}` },
+  ], true);
 
   const reader = response.body?.getReader();
   if (!reader) throw new Error('无法读取响应');

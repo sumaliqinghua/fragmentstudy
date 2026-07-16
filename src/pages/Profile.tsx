@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, KeyRound, Palette, User } from 'lucide-react';
+import { Bell, Cpu, Palette, User } from 'lucide-react';
 import { getArticles, getTotalPoints } from '../services/dataService';
 import { SettingsModal } from '../components/SettingsModal';
 import { AuthModal } from '../components/AuthModal';
@@ -113,10 +113,10 @@ export function Profile() {
             onClick={() => setShowSettings(true)}
             className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
           >
-            <KeyRound className="w-5 h-5 text-secondary" />
+            <Cpu className="w-5 h-5 text-secondary" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-800">API Key</p>
-              <p className="text-xs text-slate-400">配置 OpenAI 接口</p>
+              <p className="text-sm font-semibold text-slate-800">AI 模型</p>
+              <p className="text-xs text-slate-400">选择生成模型</p>
             </div>
           </button>
           <div className="border-t border-slate-100" />

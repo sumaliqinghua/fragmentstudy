@@ -243,7 +243,7 @@ export function OriginalTextView({
   const handleAskAI = async () => {
     if (!selection || !question.trim()) return;
     if (!isConfigured()) {
-      alert('请先在设置中配置 API Key');
+      alert('AI 服务暂未配置');
       return;
     }
 

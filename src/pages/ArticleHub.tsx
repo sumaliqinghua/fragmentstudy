@@ -150,7 +150,7 @@ export function ArticleHub({ articleId, onBack, onOpenMode }: ArticleHubProps) {
 
   const ensureConfigured = () => {
     if (!isConfigured()) {
-      setError('请先在设置中配置 API Key');
+      setError('AI 服务暂未配置');
       return false;
     }
     return true;

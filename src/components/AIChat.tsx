@@ -68,7 +68,7 @@ export function AIChat({ isOpen, currentCard, previousCards, onClose, onConversa
     if (!currentCard) return;
 
     if (!isConfigured()) {
-      setError('请先在设置中配置 API Key');
+      setError('AI 服务暂未配置');
       return;
     }
 

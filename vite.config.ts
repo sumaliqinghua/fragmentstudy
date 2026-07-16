@@ -22,16 +22,14 @@ function localOpenAIProxy(env: Record<string, string>): Plugin {
             chunks.push(buffer);
           }
           const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-            apiKey?: string;
-            apiEndpoint?: string;
             model?: string;
             messages?: { role: string; content: string }[];
             stream?: boolean;
             temperature?: number;
             response_format?: unknown;
           };
-          const apiKey = body.apiKey || env.QINIU_API_KEY || env.VITE_QINIU_API_KEY;
-          const apiEndpoint = body.apiEndpoint || env.QINIU_API_ENDPOINT || 'https://api.qnaigc.com/v1';
+          const apiKey = env.QINIU_API_KEY;
+          const apiEndpoint = env.QINIU_API_ENDPOINT || 'https://api.qnaigc.com/v1';
           const model = body.model || env.QINIU_MODEL || 'qwen/qwen3.7-plus';
           if (!apiKey) throw new Error('本地 .env 中未配置 QINIU_API_KEY');
           if (!body.messages?.length) throw new Error('缺少对话内容');
@@ -79,7 +77,7 @@ function localOpenAIProxy(env: Record<string, string>): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const supabaseUrl = env.VITE_SUPABASE_URL;
-  const hasLocalAIKey = Boolean(env.QINIU_API_KEY || env.VITE_QINIU_API_KEY);
+  const hasLocalAIKey = Boolean(env.QINIU_API_KEY);
 
   return {
     plugins: [react(), localOpenAIProxy(env)],

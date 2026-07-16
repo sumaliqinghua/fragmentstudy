@@ -214,7 +214,7 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
       return;
     }
     if (!isConfigured()) {
-      setError('请先配置 API Key');
+      setError('AI 服务暂未配置');
       return;
     }
     setError('');
