@@ -106,14 +106,8 @@ Deno.serve(async (request: Request) => {
     }
 
     if (!upstream.ok) {
-      const upstreamBody = await upstream.json().catch(() => ({})) as {
-        error?: string | { message?: string };
-      };
-      const upstreamMessage = typeof upstreamBody.error === 'string'
-        ? upstreamBody.error
-        : upstreamBody.error?.message;
       return jsonResponse(502, {
-        error: upstreamMessage || `平台 AI 请求失败 (${upstream.status})`,
+        error: `平台 AI 请求失败 (${upstream.status})`,
       });
     }
 

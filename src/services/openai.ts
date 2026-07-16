@@ -5,6 +5,7 @@ import {
   resolveAIAvailability,
   saveAIModel,
 } from './aiConfig';
+import { streamOpenAIContent } from './aiStream';
 import { isSupabaseConfigured, supabase } from './supabase';
 
 interface OpenAIConfig {
@@ -206,33 +207,7 @@ export async function* explainCard(request: AIExplanationRequest): AsyncGenerato
     { role: 'user', content: `当前学习的卡片内容：\n${cardContent}${contextInfo}\n\n我的问题：${userQuestion}` },
   ], true);
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('无法读取响应');
-
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n').filter(line => line.trim().startsWith('data:'));
-
-    for (const line of lines) {
-      const data = line.replace('data:', '').trim();
-      if (data === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed.choices[0]?.delta?.content;
-        if (content) {
-          yield content;
-        }
-      } catch {
-        continue;
-      }
-    }
-  }
+  yield* streamOpenAIContent(response);
 }
 
 function getCharacterNames(characters: string): string[] {
@@ -353,33 +328,7 @@ export async function* answerDialogueQuestion(
     { role: 'user', content: `对话上下文：\n${contextText}\n\n我的问题：${question}` },
   ], true);
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('无法读取响应');
-
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n').filter(line => line.trim().startsWith('data:'));
-
-    for (const line of lines) {
-      const data = line.replace('data:', '').trim();
-      if (data === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed.choices[0]?.delta?.content;
-        if (content) {
-          yield content;
-        }
-      } catch {
-        continue;
-      }
-    }
-  }
+  yield* streamOpenAIContent(response);
 }
 
 export async function* answerArticleTextQuestion(
@@ -400,33 +349,7 @@ export async function* answerArticleTextQuestion(
     { role: 'user', content: `选中的文字：\n"${selectedText}"${contextSection}\n\n我的问题：${question}` },
   ], true);
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('无法读取响应');
-
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n').filter(line => line.trim().startsWith('data:'));
-
-    for (const line of lines) {
-      const data = line.replace('data:', '').trim();
-      if (data === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed.choices[0]?.delta?.content;
-        if (content) {
-          yield content;
-        }
-      } catch {
-        continue;
-      }
-    }
-  }
+  yield* streamOpenAIContent(response);
 }
 
 export async function convertToGalgame(content: string, characters: string): Promise<GalgameGenerationResult[]> {

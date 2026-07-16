@@ -43,10 +43,10 @@ export function loadAIModel(store: StringStore | undefined = getBrowserStore()):
   if (!store) return DEFAULT_AI_MODEL;
 
   const configured = readModel(store.getItem(STORAGE_KEY));
-  if (configured && isAllowedAIModel(configured)) return configured;
-
   const legacyModel = readModel(store.getItem(LEGACY_STORAGE_KEY));
   store.removeItem?.(LEGACY_STORAGE_KEY);
+
+  if (configured && isAllowedAIModel(configured)) return configured;
   if (legacyModel && isAllowedAIModel(legacyModel)) {
     saveAIModel(legacyModel, store);
     return legacyModel;

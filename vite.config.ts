@@ -13,6 +13,32 @@ function localOpenAIProxy(env: Record<string, string>): Plugin {
         }
 
         try {
+          const authorization = request.headers.authorization;
+          const supabaseUrl = env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+          const anonKey = env.VITE_SUPABASE_ANON_KEY;
+          if (!authorization?.match(/^Bearer\s+\S+$/i)) {
+            response.statusCode = 401;
+            response.end(JSON.stringify({ error: '请先登录后使用 AI 生成功能' }));
+            return;
+          }
+          if (!supabaseUrl || !anonKey) {
+            response.statusCode = 503;
+            response.end(JSON.stringify({ error: '本地 Supabase 尚未配置' }));
+            return;
+          }
+
+          const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+            headers: {
+              Authorization: authorization,
+              apikey: anonKey,
+            },
+          });
+          if (!authResponse.ok) {
+            response.statusCode = 401;
+            response.end(JSON.stringify({ error: '登录已失效，请重新登录' }));
+            return;
+          }
+
           const chunks: Buffer[] = [];
           let size = 0;
           for await (const chunk of request) {

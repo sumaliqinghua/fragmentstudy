@@ -53,3 +53,19 @@ test('unknown models fall back to the platform default', () => {
 
   assert.equal(loadAIModel(store), DEFAULT_AI_MODEL);
 });
+
+test('existing model preferences still remove legacy browser credentials', () => {
+  const store = createStore();
+  saveAIModel('qwen/qwen3.7-plus', store);
+  store.setItem('openai_config', JSON.stringify({
+    apiKey: 'remove-even-when-new-preference-exists',
+    model: 'z-ai/glm-5.2',
+  }));
+
+  assert.equal(loadAIModel(store), 'qwen/qwen3.7-plus');
+  assert.equal(store.getItem('openai_config'), null);
+  assert.equal(
+    store.values().some(value => value.includes('remove-even-when-new-preference-exists')),
+    false,
+  );
+});
