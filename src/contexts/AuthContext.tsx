@@ -3,6 +3,11 @@ import { User, Session } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase, supabaseConfigError } from '../services/supabase';
 import { resetDataServiceState } from '../services/dataService';
 import { clearGuestData } from '../services/guestStorage';
+import { resolveEmailDeliveryEnabled } from '../services/authDeliveryConfig';
+
+const emailDeliveryEnabled = resolveEmailDeliveryEnabled(
+  import.meta.env.VITE_AUTH_EMAIL_DELIVERY_ENABLED,
+);
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +15,7 @@ interface AuthContextType {
   isGuest: boolean;
   isLoading: boolean;
   configError: string | null;
+  emailDeliveryEnabled: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{
     error: Error | null;
@@ -95,6 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [applySession]);
 
   const resetPassword = useCallback(async (email: string) => {
+    if (!emailDeliveryEnabled) {
+      return { error: new Error('开发阶段暂未开放邮件找回密码') };
+    }
     if (supabaseConfigError) return { error: new Error(supabaseConfigError) };
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
@@ -108,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isGuest: !user,
     isLoading,
     configError: supabaseConfigError,
+    emailDeliveryEnabled,
     signIn,
     signUp,
     signOut,

@@ -11,8 +11,10 @@ interface AuthModalProps {
 type AuthMode = 'login' | 'register' | 'reset';
 
 export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
-  const { configError, signIn, signUp, resetPassword } = useAuth();
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const { configError, emailDeliveryEnabled, signIn, signUp, resetPassword } = useAuth();
+  const [mode, setMode] = useState<AuthMode>(
+    initialMode === 'reset' && !emailDeliveryEnabled ? 'login' : initialMode,
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -77,7 +79,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
   };
 
   const switchMode = (newMode: AuthMode) => {
-    setMode(newMode);
+    setMode(newMode === 'reset' && !emailDeliveryEnabled ? 'login' : newMode);
     setError('');
     setResetSent(false);
     setRegistrationSent(false);
@@ -221,7 +223,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
                 {mode === 'reset' && '发送重置邮件'}
               </button>
 
-              {mode === 'login' && (
+              {mode === 'login' && emailDeliveryEnabled && (
                 <button
                   type="button"
                   onClick={() => switchMode('reset')}
