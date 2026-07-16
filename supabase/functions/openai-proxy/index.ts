@@ -1,93 +1,133 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import {
+  extractBearerToken,
+  ProxyRequestError,
+  resolvePlatformAIConfig,
+  validateProxyRequestBody,
+} from '../_shared/openaiProxySecurity.ts';
 
+const MAX_BODY_BYTES = 5_000_000;
+const encoder = new TextEncoder();
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+  Vary: 'Origin',
 };
 
-interface RequestBody {
-  apiKey: string;
-  apiEndpoint: string;
-  model: string;
-  messages: { role: string; content: string }[];
-  stream?: boolean;
-  temperature?: number;
-  response_format?: unknown;
+function jsonResponse(status: number, payload: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+function requireEnvironment(name: string): string {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new ProxyRequestError(`服务端缺少 ${name} 配置`, 500);
+  return value;
+}
+
+async function authenticateUser(token: string): Promise<void> {
+  const client = createClient(
+    requireEnvironment('SUPABASE_URL'),
+    requireEnvironment('SUPABASE_ANON_KEY'),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) {
+    throw new ProxyRequestError('登录已失效，请重新登录', 401);
+  }
+}
+
+Deno.serve(async (request: Request) => {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { error: '仅支持 POST 请求' });
+  }
+
+  const declaredLength = Number(request.headers.get('content-length') || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return jsonResponse(413, { error: '请求内容过大' });
   }
 
   try {
-    const body: RequestBody = await req.json();
-    const { apiKey, apiEndpoint, model, messages, stream = false, temperature = 0.7, response_format } = body;
+    const token = extractBearerToken(request.headers.get('authorization'));
+    await authenticateUser(token);
 
-    if (!apiKey || !apiEndpoint) {
-      return new Response(
-        JSON.stringify({ error: "Missing API key or endpoint" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    const rawBody = await request.text();
+    if (encoder.encode(rawBody).byteLength > MAX_BODY_BYTES) {
+      throw new ProxyRequestError('请求内容过大', 413);
     }
 
-    const openaiResponse = await fetch(`${apiEndpoint}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      throw new ProxyRequestError('请求内容不是有效 JSON', 400);
+    }
+    const body = validateProxyRequestBody(parsedBody);
+    const config = resolvePlatformAIConfig(
+      {
+        QINIU_API_KEY: Deno.env.get('QINIU_API_KEY'),
+        QINIU_API_ENDPOINT: Deno.env.get('QINIU_API_ENDPOINT'),
+        QINIU_MODEL: Deno.env.get('QINIU_MODEL'),
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream,
-        ...(response_format ? { response_format } : {}),
-        temperature,
-      }),
-    });
+      body.model,
+    );
 
-    if (!openaiResponse.ok) {
-      const errorData = await openaiResponse.json().catch(() => ({}));
-      return new Response(
-        JSON.stringify({ error: errorData.error?.message || `API request failed: ${openaiResponse.status}` }),
-        {
-          status: openaiResponse.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${config.apiEndpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: body.messages,
+          stream: body.stream,
+          temperature: body.temperature,
+          ...(body.responseFormat ? { response_format: body.responseFormat } : {}),
+        }),
+      });
+    } catch {
+      throw new ProxyRequestError('平台 AI 服务暂时无法连接', 502);
     }
 
-    if (stream) {
-      const headers = new Headers(corsHeaders);
-      headers.set("Content-Type", "text/event-stream");
-      headers.set("Cache-Control", "no-cache");
-      headers.set("Connection", "keep-alive");
-
-      return new Response(openaiResponse.body, {
-        status: 200,
-        headers,
+    if (!upstream.ok) {
+      const upstreamBody = await upstream.json().catch(() => ({})) as {
+        error?: string | { message?: string };
+      };
+      const upstreamMessage = typeof upstreamBody.error === 'string'
+        ? upstreamBody.error
+        : upstreamBody.error?.message;
+      return jsonResponse(502, {
+        error: upstreamMessage || `平台 AI 请求失败 (${upstream.status})`,
       });
     }
 
-    const data = await openaiResponse.json();
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    const headers = new Headers(corsHeaders);
+    headers.set(
+      'Content-Type',
+      body.stream ? 'text/event-stream' : (upstream.headers.get('content-type') || 'application/json'),
     );
+    headers.set('Cache-Control', 'no-store');
+    return new Response(upstream.body, { status: 200, headers });
+  } catch (error) {
+    if (error instanceof ProxyRequestError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
+    return jsonResponse(500, { error: 'AI 代理发生内部错误' });
   }
 });
