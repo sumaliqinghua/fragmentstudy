@@ -1,0 +1,39 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    logging: *default-logging
+
+  auth:
+    logging: *default-logging
+
+  rest:
+    logging: *default-logging
+
+  meta:
+    logging: *default-logging
+
+  studio:
+    logging: *default-logging
+
+  kong:
+    ports: !override
+      - "127.0.0.1:${KONG_HTTP_PORT:-8000}:8000/tcp"
+    logging: *default-logging
+
+  functions:
+    environment:
+      QINIU_API_KEY: ${QINIU_API_KEY:-}
+      QINIU_API_ENDPOINT: ${QINIU_API_ENDPOINT:-https://api.qnaigc.com/v1}
+      QINIU_MODEL: ${QINIU_MODEL:-qwen/qwen3.7-plus}
+    logging: *default-logging
+
+  supavisor:
+    ports: !override
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432/tcp"
+      - "127.0.0.1:${POOLER_PROXY_PORT_TRANSACTION:-6543}:6543/tcp"
+    logging: *default-logging
