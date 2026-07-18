@@ -51,12 +51,24 @@ POSTGRES_PORT="$(read_env_value POSTGRES_PORT)"
 
 ENCODED_PASSWORD="$(printf '%s' "$POSTGRES_PASSWORD" | jq -sRr @uri)"
 DB_URL="postgresql://postgres.${POOLER_TENANT_ID}:${ENCODED_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}"
+CLI_WORKDIR="$(mktemp -d)"
+
+cleanup() {
+  unset DB_URL ENCODED_PASSWORD POSTGRES_PASSWORD
+  rm -rf "$CLI_WORKDIR"
+}
+trap cleanup EXIT
+
+# CLI 2.72.7 drops sslmode from --db-url. Matching the configured local port
+# selects its explicit no-TLS connection path without changing project defaults.
+supabase init --workdir "$CLI_WORKDIR" --force >/dev/null
+sed -i "s/^port = 54322$/port = ${POSTGRES_PORT}/" "$CLI_WORKDIR/supabase/config.toml"
+cp -R "$PROJECT_ROOT/supabase/migrations" "$CLI_WORKDIR/supabase/"
 
 (
-  cd "$PROJECT_ROOT"
-  supabase db push --include-all --db-url "$DB_URL"
+  cd "$CLI_WORKDIR"
+  supabase db push --include-all --db-url "$DB_URL" --yes
   supabase db lint --db-url "$DB_URL"
 )
 
-unset DB_URL ENCODED_PASSWORD POSTGRES_PASSWORD
 printf '迁移已通过 Supabase CLI 应用并完成数据库 lint。\n'
