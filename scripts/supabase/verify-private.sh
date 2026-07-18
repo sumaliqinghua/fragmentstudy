@@ -38,6 +38,18 @@ compose=(docker compose
 
 "${compose[@]}" config --quiet
 
+read_env_value() {
+  local key="$1"
+  awk -v key="$key" '
+    index($0, key "=") == 1 {
+      value = substr($0, length(key) + 2)
+      sub(/\r$/, "", value)
+      print value
+      exit
+    }
+  ' "$STACK_DIR/.env"
+}
+
 for service in "${APPROVED_SERVICES[@]}"; do
   container_id="$("${compose[@]}" ps -q "$service")"
   [[ -n "$container_id" ]] || fail "$service 没有运行容器"
@@ -71,8 +83,12 @@ for port in "${LOOPBACK_PORTS[@]}"; do
   fi
 done
 
+ANON_KEY="$(read_env_value ANON_KEY)"
+[[ -n "$ANON_KEY" ]] || fail "docker/.env 缺少 ANON_KEY"
 curl --fail --silent --show-error --max-time 5 \
+  -H "apikey: $ANON_KEY" \
   http://127.0.0.1:8000/auth/v1/health >/dev/null \
   || fail "Auth health 无法通过私网网关访问"
+unset ANON_KEY
 
 printf '验证通过：批准服务健康，禁用服务缺席，原始端口仅回环可达。\n'
