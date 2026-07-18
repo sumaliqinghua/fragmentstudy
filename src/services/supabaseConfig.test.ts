@@ -19,3 +19,15 @@ test('configured Supabase values are trimmed and accepted', () => {
   assert.equal(config.url, 'https://example.supabase.co');
   assert.equal(config.anonKey, 'anon-key');
 });
+
+test('a browser proxy URL overrides the network target without changing configuration validity', () => {
+  const config = resolveSupabaseConfig(
+    ' https://racknerd.example.ts.net:8443 ',
+    ' anon-key ',
+    ' http://127.0.0.1:5182/supabase-proxy '
+  );
+
+  assert.equal(config.isConfigured, true);
+  assert.equal(config.url, 'http://127.0.0.1:5182/supabase-proxy');
+  assert.equal(config.networkUrl, 'https://racknerd.example.ts.net:8443');
+});

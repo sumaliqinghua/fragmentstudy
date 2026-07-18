@@ -6,7 +6,7 @@ import {
   saveAIModel,
 } from './aiConfig';
 import { streamOpenAIContent } from './aiStream';
-import { isSupabaseConfigured, supabase } from './supabase';
+import { isSupabaseConfigured, supabase, supabaseApiUrl } from './supabase';
 
 interface OpenAIConfig {
   model: string;
@@ -23,10 +23,10 @@ export class AIResponseParseError extends Error {
 }
 
 function getProxyUrl(): string {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.VITE_LOCAL_AI_CONFIGURED) {
     return '/openai-proxy';
   }
-  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-proxy`;
+  return `${supabaseApiUrl}/functions/v1/openai-proxy`;
 }
 
 export function getOpenAIConfig(): OpenAIConfig {

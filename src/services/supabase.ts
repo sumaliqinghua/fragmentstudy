@@ -4,11 +4,13 @@ import { resolveSupabaseConfig } from './supabaseConfig';
 
 const supabaseConfig = resolveSupabaseConfig(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.VITE_SUPABASE_BROWSER_URL
 );
 
 export const isSupabaseConfigured = supabaseConfig.isConfigured;
 export const supabaseConfigError = supabaseConfig.error;
+export const supabaseApiUrl = supabaseConfig.url;
 
 export const supabase = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
   auth: { persistSession: isSupabaseConfigured },

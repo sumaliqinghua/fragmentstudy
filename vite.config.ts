@@ -116,6 +116,12 @@ export default defineConfig(({ mode }) => {
     server: supabaseUrl
       ? {
           proxy: {
+            '/supabase-proxy': {
+              target: supabaseUrl,
+              changeOrigin: true,
+              secure: true,
+              rewrite: (path) => path.replace(/^\/supabase-proxy/, ''),
+            },
             '/content-extractor': {
               target: supabaseUrl,
               changeOrigin: true,

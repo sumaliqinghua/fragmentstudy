@@ -1,5 +1,6 @@
 export interface SupabasePublicConfig {
   url: string;
+  networkUrl: string;
   anonKey: string;
   isConfigured: boolean;
   error: string | null;
@@ -10,14 +11,17 @@ const FALLBACK_ANON_KEY = 'supabase-not-configured';
 
 export function resolveSupabaseConfig(
   rawUrl: string | undefined,
-  rawAnonKey: string | undefined
+  rawAnonKey: string | undefined,
+  rawBrowserUrl?: string | undefined
 ): SupabasePublicConfig {
-  const url = rawUrl?.trim();
+  const networkUrl = rawUrl?.trim();
+  const browserUrl = rawBrowserUrl?.trim();
   const anonKey = rawAnonKey?.trim();
-  const isConfigured = Boolean(url && anonKey);
+  const isConfigured = Boolean(networkUrl && anonKey);
 
   return {
-    url: url || FALLBACK_URL,
+    url: browserUrl || networkUrl || FALLBACK_URL,
+    networkUrl: networkUrl || FALLBACK_URL,
     anonKey: anonKey || FALLBACK_ANON_KEY,
     isConfigured,
     error: isConfigured

@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from './supabase';
 import * as guestStorage from './guestStorage';
+import { getSessionUserId } from './sessionUser';
 import type {
   Article,
   Card,
@@ -159,8 +160,7 @@ export function getRewardsCacheSnapshot(articleId: string): Reward[] | undefined
 
 async function getUserId(): Promise<string | null> {
   if (!isSupabaseConfigured) return null;
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id || null;
+  return getSessionUserId(() => supabase.auth.getSession());
 }
 
 async function isAuthenticated(): Promise<boolean> {
