@@ -210,7 +210,7 @@ ADDITIONAL_REDIRECT_URLS=http://localhost:5174/**,http://localhost:5181/**
 当前 Web 开发服务器还设置了：
 
 ```dotenv
-VITE_SUPABASE_BROWSER_URL=http://127.0.0.1:5182/supabase-proxy
+VITE_SUPABASE_BROWSER_URL=/supabase-proxy
 ```
 
 Vite 把这个同源路径代理到 tailnet HTTPS `:8443`，减少浏览器开发环境中的跨域和证书干扰。它只属于 Web/Vite 开发链路；Unity 直接访问 `https://racknerd-b4acd93.tail635b33.ts.net:8443`，不使用 Vite 代理。
@@ -1001,7 +1001,7 @@ extractor status=200 response_bytes=9288
 
 这证明匿名 AI 被拒绝，公网 MDN 页面能通过 VPS Functions 提取正文。
 
-还需要在放入低额度临时 AI Key 后验证：登录用户能完成一次非流式生成和一次流式生成。
+已用 `.env` 中已有开发 Key 验证：匿名请求返回 `401`，登录用户能完成一次非流式卡片生成和一次 SSE 流式生成；无效模型、客户端提交 `apiKey`/`apiEndpoint` 返回 `400`，日志没有 Key、JWT 或正文。
 
 ### 14.3 客户端端到端清单
 
@@ -1010,8 +1010,9 @@ extractor status=200 response_bytes=9288
 - 访客数据只在本地，重启或登录后丢弃；
 - 登录用户的科目、文章、卡片、群聊、Galgame、测验和进度持久化；
 - 未登录 AI 返回 `401` 或明确登录提示；
-- 登录后 AI 生成成功；
-- 网页提取确实走 VPS Function；
+- 登录后 AI 生成成功，且流式输出完成；
+- 网页提取优先走 VPS Function，失败时降级 Jina 并显示提示；
+- 掘金文章图片以真实 `<img>` 渲染，不出现图片占位 token；
 - 原始 PDF 没有上传；
 - 用户 B 无法读取用户 A 的数据。
 
@@ -1045,17 +1046,17 @@ chmod 600 ~/.config/fragment-article/backup-age-key.txt
 
 ### 15.3 执行备份
 
-当前 Mac 已经可以通过 Tailscale SSH 非交互连接 VPS。先验证：
+当前 Mac 通过 `fragmentarticle-backup` SSH alias，经 Tailscale IPv4 的标准 OpenSSH `443` 端口非交互连接 VPS。先验证：
 
 ```bash
-ssh -o BatchMode=yes root@100.84.96.100 true
+ssh fragmentarticle-backup true
 ```
 
-再使用同一个 Tailscale SSH 目标运行：
+再使用同一个 SSH alias 运行：
 
 ```bash
 scripts/supabase/backup-private.sh \
-  root@100.84.96.100 \
+  fragmentarticle-backup \
   'age1替换为公钥recipient' \
   "$HOME/Backups/fragment-article/supabase" \
   /opt/fragment-article/supabase
@@ -1063,7 +1064,7 @@ scripts/supabase/backup-private.sh \
 
 自动任务必须始终先验证 `BatchMode=yes` 能无交互连接。实际定时任务使用稳定脚本 `~/.local/bin/fragmentarticle-supabase-backup`，而不是依赖可能被删除的临时 Git worktree。
 
-当前已加载的 LaunchAgent 是 `~/Library/LaunchAgents/com.fragmentarticle.supabase-backup.plist`，每天本机时间 `03:20` 运行，备份写入 `~/Backups/fragment-article/supabase`。一次手动运行和一次 launchd 触发运行都已返回退出码 0。
+当前已加载的 LaunchAgent 是 `~/Library/LaunchAgents/com.fragmentarticle.supabase-backup.plist`，每天本机时间 `03:20` 运行，备份写入 `~/Backups/fragment-article/supabase`。`~/.ssh/config` 中的 `fragmentarticle-backup` 指向 `100.84.96.100:443`，使用现有 ed25519 密钥和 `BatchMode=yes`；两次最近的 launchd 触发均返回退出码 0，并生成了新的三文件快照。
 
 ### 15.4 解密检查
 
@@ -1197,18 +1198,19 @@ docker logs --tail 100 supabase-edge-functions
 - `public` 和 `extensions` 的数据库 lint 通过；
 - RLS 双用户测试 6/6 通过并回滚；
 - 匿名 `openai-proxy` 返回 `401`；
+- 登录用户通过 VPS Function 完成非流式卡片生成和 SSE 流式生成；无效模型和客户端提交 API Key 均被拒绝；
 - `content-extractor` 对公开 MDN 页面返回 `200`；
+- 浏览器链接导入优先走 `content-extractor`，失败时才降级 Jina；掘金文章的 26 张图片均以真实 `<img>` 渲染；
+- 带文本层 PDF 和扫描 PDF 均完成浏览器提取/OCR，网络记录确认没有 PDF 上传请求；
 - 注册自动确认、退出、重新登录、刷新恢复和登录用户资料持久化通过；
 - 首页重载约 3.3 秒，个人页同步约 2.4 秒；
 - 本地单元测试、typecheck、lint 无 error、生产 build 均通过；
-- Mac 已安装 `age 1.3.1`，手动备份和 launchd 触发备份均成功；
+- Mac 已安装 `age 1.3.1`，手动备份和两次 launchd 触发备份均成功；
+- 最新加密数据库快照解密后，PostgreSQL 17.6 `pg_restore --list` 成功读取 643 个 TOC 条目；
 - 临时恢复演练验证 2 个 Auth 用户、1 篇资料、19 条迁移和 17 张 RLS 表。
 
-尚未完成，不能写成“已验收”的内容：
+仍未进入当前私网开发阶段的内容：
 
-- 配置低额度临时 AI Key，并验证真实卡片生成和流式 AI；
-- 开发页面的链接导入仍使用 Jina Reader，浏览器走 VPS Function 的生产路径尚未验收；
-- 使用真实 PDF 验证只在浏览器解析且不上传；
 - 非 root sudo 用户、root 密码轮换、关闭 root 密码登录；
 - 从公网 `443` 移除 SSH；
 - SMTP、正式域名、Caddy 和公网限流；
