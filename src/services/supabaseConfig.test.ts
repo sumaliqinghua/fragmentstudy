@@ -31,3 +31,27 @@ test('a browser proxy URL overrides the network target without changing configur
   assert.equal(config.url, 'http://127.0.0.1:5182/supabase-proxy');
   assert.equal(config.networkUrl, 'https://racknerd.example.ts.net:8443');
 });
+
+test('a relative browser proxy URL resolves against the current browser origin', () => {
+  const originalLocation = globalThis.location;
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: { origin: 'http://localhost:5183' },
+  });
+
+  try {
+    const config = resolveSupabaseConfig(
+      'https://network.example.supabase.co',
+      ' anon-key ',
+      '/supabase-proxy',
+    );
+
+    assert.equal(config.url, 'http://localhost:5183/supabase-proxy');
+    assert.equal(config.networkUrl, 'https://network.example.supabase.co');
+  } finally {
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
+  }
+});
