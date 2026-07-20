@@ -26,9 +26,27 @@ type ProgressHandler = (progress: ImportProgress) => void;
 
 const MIN_PAGE_TEXT_LENGTH = 40;
 const MAX_BROWSER_OCR_PAGES = 40;
+const FALLBACK_WARNING = '已使用备用网页识别服务，请在预览中检查标题和正文';
+
+type ContentImportEnv = {
+  DEV?: boolean;
+  VITE_SUPABASE_URL?: string;
+  VITE_SUPABASE_ANON_KEY?: string;
+};
+
+let contentImportEnvOverride: ContentImportEnv | null = null;
+
+export function setContentImportEnvForTesting(env: ContentImportEnv | null): void {
+  contentImportEnvOverride = env;
+}
 
 function report(onProgress: ProgressHandler | undefined, progress: ImportProgress): void {
   onProgress?.(progress);
+}
+
+function getContentImportEnv(): ContentImportEnv {
+  if (contentImportEnvOverride) return contentImportEnvOverride;
+  return (import.meta as ImportMeta & { env?: ContentImportEnv }).env ?? {};
 }
 
 async function extractPageText(page: PDFPageProxy): Promise<string> {
@@ -147,24 +165,41 @@ function normalizeUrl(value: string): string {
   return parsed.toString();
 }
 
-function getExtractorUrl(): string {
-  if (import.meta.env.DEV) return '/content-extractor';
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  return supabaseUrl ? `${supabaseUrl}/functions/v1/content-extractor` : '/content-extractor';
+function hasSupabaseConfig(env: ContentImportEnv): boolean {
+  return Boolean(env.VITE_SUPABASE_URL?.trim() && env.VITE_SUPABASE_ANON_KEY?.trim());
 }
 
-async function fetchViaExtractor(url: string): Promise<{ title: string; content: string }> {
-  const response = await fetch(getExtractorUrl(), {
+function getExtractorUrl(env: ContentImportEnv): string | null {
+  if (!hasSupabaseConfig(env)) return null;
+  if (env.DEV) return '/content-extractor';
+  const supabaseUrl = env.VITE_SUPABASE_URL?.trim().replace(/\/+$/, '');
+  return `${supabaseUrl}/functions/v1/content-extractor`;
+}
+
+function getExtractorHeaders(env: ContentImportEnv): Record<string, string> {
+  const anonKey = env.VITE_SUPABASE_ANON_KEY?.trim() || '';
+  return {
+    'Content-Type': 'application/json',
+    apikey: anonKey,
+    Authorization: `Bearer ${anonKey}`,
+  };
+}
+
+async function fetchViaExtractor(url: string, env: ContentImportEnv): Promise<{ title: string; content: string }> {
+  const extractorUrl = getExtractorUrl(env);
+  if (!extractorUrl) throw new Error('Supabase 未配置');
+  const response = await fetch(extractorUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ''}`,
-    },
+    headers: getExtractorHeaders(env),
     body: JSON.stringify({ url }),
   });
   const data = await response.json().catch(() => ({})) as { title?: string; content?: string; error?: string };
   if (!response.ok || !data.content) throw new Error(data.error || '网页正文提取失败');
   return { title: data.title || new URL(url).hostname, content: data.content };
+}
+
+function normalizeReaderContent(content: string): string {
+  return content.replace(/^!Image\s*(\d+)\s*(https?:\/\/\S+)$/gm, '![Image $1]($2)');
 }
 
 async function fetchViaReader(url: string): Promise<{ title: string; content: string }> {
@@ -177,7 +212,7 @@ async function fetchViaReader(url: string): Promise<{ title: string; content: st
   const titleMatch = content.match(/^Title:\s*(.+)$/m);
   return {
     title: titleMatch?.[1]?.trim() || new URL(url).hostname,
-    content,
+    content: normalizeReaderContent(content),
   };
 }
 
@@ -189,16 +224,18 @@ export async function extractUrlContent(
   report(onProgress, { stage: 'fetching', message: '正在识别网页正文...', progress: 0.2 });
   let result: { title: string; content: string };
   const warnings: string[] = [];
-  if (import.meta.env.DEV) {
-    result = await fetchViaReader(url);
-  } else {
+  const env = getContentImportEnv();
+  const extractorUrl = getExtractorUrl(env);
+  if (extractorUrl) {
     try {
-      result = await fetchViaExtractor(url);
+      result = await fetchViaExtractor(url, env);
     } catch {
       report(onProgress, { stage: 'fetching', message: '正在尝试备用识别方式...', progress: 0.6 });
       result = await fetchViaReader(url);
-      warnings.push('已使用备用网页识别服务，请在预览中检查标题和正文');
+      warnings.push(FALLBACK_WARNING);
     }
+  } else {
+    result = await fetchViaReader(url);
   }
   report(onProgress, { stage: 'fetching', message: '网页识别完成', progress: 1 });
   return {
