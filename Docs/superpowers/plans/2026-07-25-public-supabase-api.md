@@ -209,7 +209,7 @@ grep -Fx 'SUPABASE_PUBLIC_URL=https://api.iamchatgpt.top' "$env_file"
 grep -Fx 'API_EXTERNAL_URL=https://api.iamchatgpt.top/auth/v1' "$env_file"
 grep -Fx 'SITE_URL=fragmentarticle://auth/callback' "$env_file"
 grep -Fx "ADDITIONAL_REDIRECT_URLS=$redirects" "$env_file"
-grep -Fx 'DISABLE_SIGNUP=false' "$env_file"
+grep -Fx 'DISABLE_SIGNUP=true' "$env_file"
 test "$(stat -f '%Lp' "$env_file" 2>/dev/null || stat -c '%a' "$env_file")" = 600
 test "$(find "$root/backups/public-rollout" -type f -name 'docker.env.*.bak' | wc -l | tr -d ' ')" = 1
 ```
@@ -236,17 +236,19 @@ The script must:
 
 - [x] **Step 3: Implement atomic updates**
 
-Use an internal `set_env_value` function based on `awk`, write through `mktemp` in the same directory, `chmod 0600`, then `mv`. Set:
+Use one `awk` pass to stage the complete result through `mktemp` in the same
+directory, `chmod 0600`, then perform one final `mv`. Set:
 
 ```text
 SUPABASE_PUBLIC_URL
 API_EXTERNAL_URL=<base>/auth/v1
 SITE_URL
 ADDITIONAL_REDIRECT_URLS
-DISABLE_SIGNUP=false
 ```
 
-The script intentionally leaves signup enabled until the owner account is confirmed.
+The script must preserve the existing `DISABLE_SIGNUP` value. Owner bootstrap
+and signup closure are separate operations, so a later domain change cannot
+silently reopen public registration.
 
 - [x] **Step 4: Update the non-secret environment example**
 
@@ -682,7 +684,8 @@ redirects: fragmentarticle://auth/callback,http://localhost:5174/**,http://local
 install root: /opt/fragment-article/supabase
 ```
 
-Keep `DISABLE_SIGNUP=false` for owner bootstrap.
+Set `DISABLE_SIGNUP=false` before owner bootstrap if needed. The URL
+configuration script preserves the current value.
 
 - [x] **Step 4: Recreate only affected services**
 

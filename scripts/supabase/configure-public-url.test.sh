@@ -43,7 +43,7 @@ grep -Fx 'SUPABASE_PUBLIC_URL=https://api.iamchatgpt.top' "$ENV_FILE"
 grep -Fx 'API_EXTERNAL_URL=https://api.iamchatgpt.top/auth/v1' "$ENV_FILE"
 grep -Fx 'SITE_URL=fragmentarticle://auth/callback' "$ENV_FILE"
 grep -Fx "ADDITIONAL_REDIRECT_URLS=$REDIRECTS" "$ENV_FILE"
-grep -Fx 'DISABLE_SIGNUP=false' "$ENV_FILE"
+grep -Fx 'DISABLE_SIGNUP=true' "$ENV_FILE"
 grep -Fx 'UNCHANGED_VALUE=preserved' "$ENV_FILE"
 
 if stat -f '%Lp' "$ENV_FILE" >/dev/null 2>&1; then

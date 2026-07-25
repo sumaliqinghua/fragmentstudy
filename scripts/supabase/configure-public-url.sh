@@ -53,12 +53,10 @@ awk \
     order[2] = "API_EXTERNAL_URL"
     order[3] = "SITE_URL"
     order[4] = "ADDITIONAL_REDIRECT_URLS"
-    order[5] = "DISABLE_SIGNUP"
     values[order[1]] = public_url
     values[order[2]] = api_url
     values[order[3]] = site_url
     values[order[4]] = redirects
-    values[order[5]] = "false"
   }
   {
     separator = index($0, "=")
@@ -71,7 +69,7 @@ awk \
     print
   }
   END {
-    for (position = 1; position <= 5; position += 1) {
+    for (position = 1; position <= 4; position += 1) {
       key = order[position]
       if (!seen[key]) print key "=" values[key]
     }

@@ -1299,7 +1299,7 @@ ADDITIONAL_REDIRECT_URLS=fragmentarticle://auth/callback,http://localhost:5174/*
 公网部署必须从干净、已提交的 revision 同步。仓库提供：
 
 - `infra/supabase/Caddyfile.public`：公网路径 allowlist；
-- `scripts/supabase/configure-public-url.sh`：原子更新 URL 并备份 `.env`；
+- `scripts/supabase/configure-public-url.sh`：原子更新 URL、保留注册开关并备份 `.env`；
 - `scripts/supabase/verify-public.sh`：验证 DNS、TLS、匿名拒绝与端口边界。
 
 若 Caddy、TLS 或 Supabase URL 切换失败：

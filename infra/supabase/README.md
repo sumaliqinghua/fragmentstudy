@@ -130,7 +130,8 @@ sudo systemctl reload caddy
 sudo journalctl -u caddy -n 100 --no-pager
 ```
 
-公网 URL 必须通过脚本写入官方 `.env`，脚本会先建立权限为 `0600` 的回滚副本：
+公网 URL 必须通过脚本写入官方 `.env`，脚本会先建立权限为 `0600` 的回滚副本，
+并原样保留现有 `DISABLE_SIGNUP`，避免换域名时重新开放注册：
 
 ```bash
 sudo scripts/supabase/configure-public-url.sh \
