@@ -200,7 +200,7 @@ Use a Lore commit that records the public-proxy abuse constraint and confirms an
 - Produces: an atomic, permission-preserving update of the official `docker/.env`
 - Produces: a timestamped mode-`0600` backup under `<install-root>/backups/public-rollout`
 
-- [ ] **Step 1: Write a failing shell fixture test**
+- [x] **Step 1: Write a failing shell fixture test**
 
 The test creates a temporary install root with a representative `docker/.env`, runs the script, and asserts:
 
@@ -222,7 +222,7 @@ bash scripts/supabase/configure-public-url.test.sh
 
 Expected: FAIL because the configuration script does not exist.
 
-- [ ] **Step 2: Implement strict argument and URL validation**
+- [x] **Step 2: Implement strict argument and URL validation**
 
 The script must:
 
@@ -234,7 +234,7 @@ The script must:
 - refuse to continue if `docker/.env` is missing;
 - never print `.env` contents.
 
-- [ ] **Step 3: Implement atomic updates**
+- [x] **Step 3: Implement atomic updates**
 
 Use an internal `set_env_value` function based on `awk`, write through `mktemp` in the same directory, `chmod 0600`, then `mv`. Set:
 
@@ -248,11 +248,11 @@ DISABLE_SIGNUP=false
 
 The script intentionally leaves signup enabled until the owner account is confirmed.
 
-- [ ] **Step 4: Update the non-secret environment example**
+- [x] **Step 4: Update the non-secret environment example**
 
 Document the public values as comments without replacing the private defaults or adding secrets.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -264,7 +264,7 @@ git diff --check
 
 Expected: all exit `0`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Use a Lore commit that records why owner bootstrap and signup closure are separate operations.
 
