@@ -1,0 +1,24 @@
+api.iamchatgpt.top {
+	encode zstd gzip
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Cache-Control "no-store"
+	}
+
+	@approved path /auth/v1/* /rest/v1/* /functions/v1/*
+	handle @approved {
+		request_body {
+			max_size 16MB
+		}
+		reverse_proxy 127.0.0.1:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		respond "Not Found" 404
+	}
+}

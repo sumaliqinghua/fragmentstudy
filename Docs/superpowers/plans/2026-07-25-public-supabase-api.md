@@ -282,7 +282,7 @@ Use a Lore commit that records why owner bootstrap and signup closure are separa
 - Caddy proxies only approved path prefixes to `127.0.0.1:8000`
 - `verify-public.sh <domain> <public-ip> [ssh-port]` returns nonzero on any exposure or health failure
 
-- [ ] **Step 1: Add the Caddy policy**
+- [x] **Step 1: Add the Caddy policy**
 
 The Caddyfile must:
 
@@ -311,19 +311,12 @@ api.iamchatgpt.top {
 		respond "Not Found" 404
 	}
 
-	log {
-		output file /var/log/caddy/fragmentarticle-api.log {
-			roll_size 10MiB
-			roll_keep 5
-		}
-		format json
-	}
 }
 ```
 
-Caddy's access log must remain at its default request metadata level; never add header or body logging.
+Do not enable Caddy site access logging. Default access logs include the full URI, and Auth query parameters may contain one-time codes. Use systemd error logs only.
 
-- [ ] **Step 2: Implement public verification**
+- [x] **Step 2: Implement public verification**
 
 `verify-public.sh` must verify:
 
@@ -338,11 +331,11 @@ Caddy's access log must remain at its default request metadata level; never add 
 
 The script must not echo the anon key.
 
-- [ ] **Step 3: Document install and rollback commands**
+- [x] **Step 3: Document install and rollback commands**
 
 Add exact Caddy install, validate, reload, log, and rollback commands to `infra/supabase/README.md`.
 
-- [ ] **Step 4: Validate locally**
+- [x] **Step 4: Validate locally**
 
 Run:
 
@@ -353,7 +346,7 @@ git diff --check
 
 Run `caddy validate --config /etc/caddy/Caddyfile` later on the VPS before reloading.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Use a Lore commit that records why the Kong root route and Studio are deliberately unavailable.
 

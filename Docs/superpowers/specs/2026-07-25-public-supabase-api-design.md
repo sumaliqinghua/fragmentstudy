@@ -107,7 +107,7 @@ Caddy 使用 `api.iamchatgpt.top` 自动申请并续期证书，反向代理到 
 - 设置安全响应头；
 - 不缓存 Auth、REST 或 Functions 响应；
 - 对未批准路径返回 `404`；
-- 日志不记录 Authorization、请求正文、AI Key 或数据库凭据。
+- 不启用 Caddy 站点访问日志，避免 Auth 查询参数中的一次性 code 被记录；只保留 systemd 错误日志。
 
 ## 7. Supabase 和客户端配置
 

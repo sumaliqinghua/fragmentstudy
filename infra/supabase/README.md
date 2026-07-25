@@ -84,6 +84,73 @@ sudo docker compose \
 
 首次启动后还必须运行仓库中的 RLS 双用户测试和浏览器端到端验收。静态脚本不能代替这两项验证。
 
+## 公网 App API
+
+公网阶段使用 `api.iamchatgpt.top`，但继续保留 Tailscale `:8443` 作为回退入口。必须先验证非 root SSH `2222`，再释放 `443` 给 Caddy。公网只批准：
+
+```text
+/auth/v1/*
+/rest/v1/*
+/functions/v1/*
+```
+
+根路径、Studio、Meta、Storage、Realtime 和其他未知路径统一返回 `404`。Caddy 不启用站点访问日志，避免 Auth 查询参数中的一次性 code 被记录。
+
+在 Ubuntu 上安装 Caddy：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+sudo chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+sudo chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update
+sudo apt-get install -y caddy
+```
+
+安装已提交的策略并在启动前验证：
+
+```bash
+sudo install -m 0644 \
+  infra/supabase/Caddyfile.public \
+  /etc/caddy/Caddyfile
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl enable --now caddy
+```
+
+公网 URL 必须通过脚本写入官方 `.env`，脚本会先建立权限为 `0600` 的回滚副本：
+
+```bash
+sudo scripts/supabase/configure-public-url.sh \
+  https://api.iamchatgpt.top \
+  fragmentarticle://auth/callback \
+  'fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://iamchatgpt.top/**,https://www.iamchatgpt.top/**' \
+  /opt/fragment-article/supabase
+```
+
+部署后从 VPS 执行：
+
+```bash
+sudo scripts/supabase/verify-public.sh \
+  api.iamchatgpt.top \
+  107.175.95.166 \
+  2222 \
+  /opt/fragment-article/supabase
+```
+
+若 TLS 或路由验证失败，停止 Caddy 并继续使用 Tailscale：
+
+```bash
+sudo systemctl stop caddy
+sudo systemctl disable caddy
+```
+
+从 `/opt/fragment-article/supabase/backups/public-rollout/` 选择本次部署前的 `.env` 备份恢复，然后只重建受影响的 `auth`、`studio` 和 `functions`。SSH 已迁到 `2222` 后不要因为 Caddy 故障自动改回 `443`。
+
 ## Mac 加密备份
 
 Mac 安装 `age` 并生成身份文件后，通过 Tailscale 主动拉取备份：
