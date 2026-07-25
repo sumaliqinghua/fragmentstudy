@@ -478,18 +478,19 @@ nano .env
 
 ### 8.3 `FUNCTIONS_VERIFY_JWT=false` 为什么不是安全漏洞
 
-本项目有两类函数：
+当前 `content-extractor` 和 `openai-proxy` 都只允许登录用户调用。前者防止
+VPS 成为匿名网页抓取代理，后者保护付费 AI 配额。
 
-- `content-extractor` 允许访客提取公开网页；
-- `openai-proxy` 会消耗付费 AI 配额，必须登录。
-
-自托管 Edge Runtime 的全局 JWT 开关不能同时表达这两种规则，因此设为：
+本项目把“用户当前是否仍然有效”的判断统一放在函数内部，通过 Auth
+`getUser(token)` 完成，而不把 Edge Runtime 的全局 JWT 开关当作最终安全边界：
 
 ```dotenv
 FUNCTIONS_VERIFY_JWT=false
 ```
 
-这只是关闭 Functions 网关的统一 JWT 校验。`openai-proxy` 内部仍会提取 `Bearer` token，并调用 Supabase Auth 的 `getUser(token)` 验证真实用户。不要删除函数内部鉴权。
+这只是关闭 Functions 网关的统一 JWT 校验。两个函数内部都会提取
+`Bearer` token，并调用 Supabase Auth 的 `getUser(token)` 验证真实用户。
+匿名调用会返回 `401`，不要删除任何一个函数的内部鉴权。
 
 ## 9. 同步项目制品并启动服务
 
@@ -1011,7 +1012,8 @@ extractor status=200 response_bytes=9288
 - 登录用户的科目、文章、卡片、群聊、Galgame、测验和进度持久化；
 - 未登录 AI 返回 `401` 或明确登录提示；
 - 登录后 AI 生成成功，且流式输出完成；
-- 网页提取优先走 VPS Function，失败时降级 Jina 并显示提示；
+- 登录用户的网页提取走 VPS Function，错误直接显示且不向第三方外传 URL；
+- 未登录访客收到 Function `401` 后，客户端才降级 Jina 并显示提示；
 - 掘金文章图片以真实 `<img>` 渲染，不出现图片占位 token；
 - 原始 PDF 没有上传；
 - 用户 B 无法读取用户 A 的数据。
@@ -1333,7 +1335,7 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 - 匿名 `openai-proxy` 和 `content-extractor` 均返回 `401`；
 - 临时登录账号通过 VPS Function 完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；无效模型和客户端提交 API Key 均返回 `400`，验收账号随后删除；
 - 数据库只保留 1 个 owner，公开注册返回 `422`，Auth health 返回 `200`；
-- 浏览器链接导入优先走 `content-extractor`，失败时才降级 Jina；掘金文章的 26 张图片均以真实 `<img>` 渲染；
+- 登录用户的浏览器链接导入走 `content-extractor`，错误直接显示；仅未登录访客收到 `401` 后才降级 Jina，掘金文章的 26 张图片均以真实 `<img>` 渲染；
 - 带文本层 PDF 和扫描 PDF 均完成浏览器提取/OCR，网络记录确认没有 PDF 上传请求；
 - 注册自动确认、退出、重新登录、刷新恢复和登录用户资料持久化通过；
 - 首页重载约 3.3 秒，个人页同步约 2.4 秒；

@@ -194,8 +194,8 @@ scripts/supabase/backup-private.sh \
 - 19 条迁移已记录，数据库 lint 通过，RLS 双用户隔离测试 6/6 通过；
 - 匿名 `openai-proxy` 返回 `401`；
 - 登录用户通过 VPS Function 完成非流式卡片生成和 SSE 流式生成；无效模型和客户端提交 API Key 均被拒绝，日志未泄露 Key、JWT 或正文；
-- 直接调用 VPS `content-extractor` 返回 `200`，MDN 正文响应 9288 字节；
-- 浏览器链接导入优先调用 VPS `content-extractor`，失败时才降级 Jina，并向用户显示降级提示；掘金文章的 26 张图片均以真实 `<img>` 渲染，不再泄漏图片占位 token；
+- 携带登录用户 token 直接调用 VPS `content-extractor` 返回 `200`，MDN 正文响应 9288 字节；
+- 登录用户的浏览器链接导入调用 VPS `content-extractor`，错误直接显示；仅未登录访客收到 `401` 后才降级 Jina 并显示提示。掘金文章的 26 张图片均以真实 `<img>` 渲染，不再泄漏图片占位 token；
 - 浏览器导入带文本层 PDF 和扫描 PDF 均完成提取/OCR；网络记录确认没有 PDF 上传、Storage 或 Function 写入请求；
 - 注册自动确认、退出、重新登录、刷新恢复和登录用户资料持久化通过；
 - 首页重复远程用户校验已移除，实测重载约 3.3 秒、个人页同步约 2.4 秒；
