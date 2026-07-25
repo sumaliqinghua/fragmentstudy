@@ -23,7 +23,7 @@ function setContentImportEnv(env: Parameters<typeof setContentImportEnvForTestin
   return () => setContentImportEnvForTesting(null);
 }
 
-test('configured dev imports call the extractor first with both Supabase auth headers', async () => {
+test('configured dev imports send the anon key and restored user token separately', async () => {
   const calls: FetchCall[] = [];
   const restoreFetch = installFetchStub(async (input, init) => {
     calls.push({ input, init });
@@ -39,11 +39,15 @@ test('configured dev imports call the extractor first with both Supabase auth he
   });
 
   try {
-    const result = await extractUrlContent('https://juejin.cn/post/1');
+    const result = await extractUrlContent(
+      'https://juejin.cn/post/1',
+      undefined,
+      'user-token',
+    );
 
     assert.equal(calls.length, 1);
     assert.equal(calls[0].input, '/content-extractor');
-    assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, 'Bearer anon-key');
+    assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, 'Bearer user-token');
     assert.equal((calls[0].init?.headers as Record<string, string>).apikey, 'anon-key');
     assert.equal(result.title, 'Extractor title');
     assert.deepEqual(result.warnings, []);

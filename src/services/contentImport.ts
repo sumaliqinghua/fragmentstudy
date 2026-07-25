@@ -176,21 +176,28 @@ function getExtractorUrl(env: ContentImportEnv): string | null {
   return `${supabaseUrl}/functions/v1/content-extractor`;
 }
 
-function getExtractorHeaders(env: ContentImportEnv): Record<string, string> {
+function getExtractorHeaders(
+  env: ContentImportEnv,
+  accessToken?: string,
+): Record<string, string> {
   const anonKey = env.VITE_SUPABASE_ANON_KEY?.trim() || '';
   return {
     'Content-Type': 'application/json',
     apikey: anonKey,
-    Authorization: `Bearer ${anonKey}`,
+    Authorization: `Bearer ${accessToken || anonKey}`,
   };
 }
 
-async function fetchViaExtractor(url: string, env: ContentImportEnv): Promise<{ title: string; content: string }> {
+async function fetchViaExtractor(
+  url: string,
+  env: ContentImportEnv,
+  accessToken?: string,
+): Promise<{ title: string; content: string }> {
   const extractorUrl = getExtractorUrl(env);
   if (!extractorUrl) throw new Error('Supabase 未配置');
   const response = await fetch(extractorUrl, {
     method: 'POST',
-    headers: getExtractorHeaders(env),
+    headers: getExtractorHeaders(env, accessToken),
     body: JSON.stringify({ url }),
   });
   const data = await response.json().catch(() => ({})) as { title?: string; content?: string; error?: string };
@@ -218,7 +225,8 @@ async function fetchViaReader(url: string): Promise<{ title: string; content: st
 
 export async function extractUrlContent(
   value: string,
-  onProgress?: ProgressHandler
+  onProgress?: ProgressHandler,
+  accessToken?: string,
 ): Promise<ImportedContent> {
   const url = normalizeUrl(value);
   report(onProgress, { stage: 'fetching', message: '正在识别网页正文...', progress: 0.2 });
@@ -228,7 +236,7 @@ export async function extractUrlContent(
   const extractorUrl = getExtractorUrl(env);
   if (extractorUrl) {
     try {
-      result = await fetchViaExtractor(url, env);
+      result = await fetchViaExtractor(url, env, accessToken);
     } catch {
       report(onProgress, { stage: 'fetching', message: '正在尝试备用识别方式...', progress: 0.6 });
       result = await fetchViaReader(url);

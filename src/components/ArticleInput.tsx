@@ -19,6 +19,7 @@ import {
 } from '../services/dataService';
 import { AIResponseParseError, generateLearningArticle, isConfigured } from '../services/openai';
 import { extractPdfContent, extractUrlContent, type ImportProgress } from '../services/contentImport';
+import { supabase } from '../services/supabase';
 import type { SourceType, Subject } from '../types';
 
 interface ArticleInputProps {
@@ -194,7 +195,12 @@ export function ArticleInput({ isOpen, onClose, onSuccess, initialMode }: Articl
     setWarnings([]);
     setIsImporting(true);
     try {
-      const result = await extractUrlContent(urlInput, setImportProgress);
+      const { data: { session } } = await supabase.auth.getSession();
+      const result = await extractUrlContent(
+        urlInput,
+        setImportProgress,
+        session?.access_token,
+      );
       setTitle(result.title);
       setContent(result.content);
       setSourceType(result.sourceType);

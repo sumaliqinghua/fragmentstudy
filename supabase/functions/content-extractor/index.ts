@@ -1,6 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Readability } from "npm:@mozilla/readability@0.6.0";
 import { parseHTML } from "npm:linkedom@0.18.12";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import {
+  extractUserBearerToken,
+  FunctionAuthError,
+} from "../_shared/functionAuthSecurity.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +18,30 @@ function json(data: unknown, status = 200): Response {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function requireEnvironment(name: string): string {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new FunctionAuthError(`服务端缺少 ${name} 配置`, 500);
+  return value;
+}
+
+async function authenticateUser(token: string): Promise<void> {
+  const client = createClient(
+    requireEnvironment("SUPABASE_URL"),
+    requireEnvironment("SUPABASE_ANON_KEY"),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) {
+    throw new FunctionAuthError("登录已失效，请重新登录");
+  }
 }
 
 function isPrivateHostname(hostname: string): boolean {
@@ -62,6 +91,9 @@ Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
+    const token = extractUserBearerToken(request.headers.get("authorization"));
+    await authenticateUser(token);
+
     const body = await request.json() as { url?: string };
     const target = new URL(body.url || "");
     if (!["http:", "https:"].includes(target.protocol) || isPrivateHostname(target.hostname)) {
@@ -93,6 +125,9 @@ Deno.serve(async (request: Request) => {
       sourceUrl: target.toString(),
     });
   } catch (error) {
+    if (error instanceof FunctionAuthError) {
+      return json({ error: error.message }, error.status);
+    }
     if (error instanceof DOMException && error.name === "AbortError") {
       return json({ error: "网页读取超时" }, 408);
     }

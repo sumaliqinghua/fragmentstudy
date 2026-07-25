@@ -39,7 +39,7 @@
 - Produces: `extractUrlContent(value, onProgress?, accessToken?)`
 - Consumes: `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the Functions environment
 
-- [ ] **Step 1: Write the failing token parsing test**
+- [x] **Step 1: Write the failing token parsing test**
 
 ```ts
 import assert from 'node:assert/strict';
@@ -63,7 +63,7 @@ test('content extraction requires a bearer user token', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails**
+- [x] **Step 2: Run the test and confirm it fails**
 
 Run:
 
@@ -73,7 +73,7 @@ node --test supabase/functions/_shared/functionAuthSecurity.test.ts
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the pure authentication parser**
+- [x] **Step 3: Implement the pure authentication parser**
 
 ```ts
 export class FunctionAuthError extends Error {
@@ -93,7 +93,7 @@ export function extractUserBearerToken(header: string | null): string {
 }
 ```
 
-- [ ] **Step 4: Add live Supabase user validation to `content-extractor`**
+- [x] **Step 4: Add live Supabase user validation to `content-extractor`**
 
 Import `createClient` from `npm:@supabase/supabase-js@2.57.4` and the pure parser. Add:
 
@@ -132,7 +132,7 @@ await authenticateUser(token);
 
 Catch `FunctionAuthError` before the generic error and return its status without logging the token.
 
-- [ ] **Step 5: Send the restored user access token from the client**
+- [x] **Step 5: Send the restored user access token from the client**
 
 Change `extractUrlContent` to accept an optional access token:
 
@@ -170,7 +170,7 @@ assert.equal(headers.Authorization, 'Bearer user-token');
 
 Keep the existing Jina fallback for guests: an anon-key Function `401` may fall back without making the public Function anonymous.
 
-- [ ] **Step 6: Run focused and complete tests**
+- [x] **Step 6: Run focused and complete tests**
 
 Run:
 
@@ -182,7 +182,7 @@ npm run typecheck
 
 Expected: focused test PASS, complete tests PASS, typecheck exit `0`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Use a Lore commit that records the public-proxy abuse constraint and confirms anonymous extraction now returns `401`.
 
