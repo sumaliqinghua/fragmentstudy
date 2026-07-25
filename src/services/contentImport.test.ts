@@ -57,13 +57,13 @@ test('configured dev imports send the anon key and restored user token separatel
   }
 });
 
-test('configured imports fall back to Jina and warn when the extractor fails', async () => {
+test('configured guest imports fall back to Jina only when the extractor returns 401', async () => {
   const calls: FetchCall[] = [];
   const restoreFetch = installFetchStub(async (input, init) => {
     calls.push({ input, init });
     if (calls.length === 1) {
-      return new Response(JSON.stringify({ error: '识别到的正文过短，请检查链接' }), {
-        status: 422,
+      return new Response(JSON.stringify({ error: '请先登录后导入网页' }), {
+        status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -99,6 +99,37 @@ test('configured imports fall back to Jina and warn when the extractor fails', a
     assert.match(result.warnings[0] ?? '', /备用网页识别服务/);
     assert.match(result.content, /!\[Cover\]\(https:\/\/cdn\.example\.com\/cover\.png\)/);
     assert.match(result.content, /!\[Image 1\]\(https:\/\/cdn\.example\.com\/broken\.png\?a=1\)/);
+  } finally {
+    restoreEnv();
+    restoreFetch();
+  }
+});
+
+test('authenticated imports surface extractor errors without disclosing the URL to Jina', async () => {
+  const calls: FetchCall[] = [];
+  const restoreFetch = installFetchStub(async (input, init) => {
+    calls.push({ input, init });
+    return new Response(JSON.stringify({ error: '识别到的正文过短，请检查链接' }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  const restoreEnv = setContentImportEnv({
+    DEV: false,
+    VITE_SUPABASE_URL: 'https://example.supabase.co',
+    VITE_SUPABASE_ANON_KEY: 'anon-key',
+  });
+
+  try {
+    await assert.rejects(
+      () => extractUrlContent('https://private.example.com/article', undefined, 'user-token'),
+      /识别到的正文过短/,
+    );
+    assert.equal(calls.length, 1);
+    assert.equal(
+      calls[0].input,
+      'https://example.supabase.co/functions/v1/content-extractor',
+    );
   } finally {
     restoreEnv();
     restoreFetch();

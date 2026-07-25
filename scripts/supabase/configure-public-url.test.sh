@@ -7,8 +7,22 @@ trap 'rm -rf "$ROOT"' EXIT
 
 ENV_FILE="$ROOT/docker/.env"
 REDIRECTS='fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://iamchatgpt.top/**,https://www.iamchatgpt.top/**'
+FAKE_BIN="$ROOT/bin"
+export REAL_MV="$(command -v mv)"
+export MV_COUNTER="$ROOT/mv-counter"
 
-mkdir -p "$(dirname "$ENV_FILE")"
+mkdir -p "$(dirname "$ENV_FILE")" "$FAKE_BIN"
+printf '0\n' > "$MV_COUNTER"
+cat > "$FAKE_BIN/mv" <<'FAKE_MV'
+#!/usr/bin/env bash
+set -euo pipefail
+
+count="$(cat "$MV_COUNTER")"
+printf '%s\n' "$((count + 1))" > "$MV_COUNTER"
+"$REAL_MV" "$@"
+FAKE_MV
+chmod +x "$FAKE_BIN/mv"
+
 printf '%s\n' \
   'SUPABASE_PUBLIC_URL=http://127.0.0.1:8000' \
   'API_EXTERNAL_URL=http://127.0.0.1:8000/auth/v1' \
@@ -19,7 +33,7 @@ printf '%s\n' \
   > "$ENV_FILE"
 chmod 0600 "$ENV_FILE"
 
-"$SCRIPT_DIR/configure-public-url.sh" \
+PATH="$FAKE_BIN:$PATH" "$SCRIPT_DIR/configure-public-url.sh" \
   'https://api.iamchatgpt.top' \
   'fragmentarticle://auth/callback' \
   "$REDIRECTS" \
@@ -38,6 +52,10 @@ else
   MODE="$(stat -c '%a' "$ENV_FILE")"
 fi
 [[ "$MODE" == 600 ]]
+if [[ "$(cat "$MV_COUNTER")" != 1 ]]; then
+  printf '预期仅执行一次最终 mv，实际执行 %s 次。\n' "$(cat "$MV_COUNTER")" >&2
+  exit 1
+fi
 
 BACKUP_COUNT="$(
   find "$ROOT/backups/public-rollout" -type f -name 'docker.env.*.bak' \

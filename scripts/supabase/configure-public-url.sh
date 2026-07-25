@@ -36,32 +36,50 @@ BACKUP_FILE="$BACKUP_ROOT/docker.env.$(date -u '+%Y%m%dT%H%M%SZ').bak"
 cp -p "$ENV_FILE" "$BACKUP_FILE"
 chmod 0600 "$BACKUP_FILE"
 
-set_env_value() {
-  local key="$1"
-  local value="$2"
-  local temp_file
+TEMP_FILE="$(mktemp "$ENV_FILE.tmp.XXXXXX")"
+cleanup() {
+  rm -f "$TEMP_FILE"
+}
+trap cleanup EXIT
 
-  temp_file="$(mktemp "$ENV_FILE.tmp.XXXXXX")"
-  awk -v key="$key" -v value="$value" '
-    BEGIN { replaced = 0 }
-    index($0, key "=") == 1 {
-      if (!replaced) print key "=" value
-      replaced = 1
+awk \
+  -v public_url="$PUBLIC_BASE_URL" \
+  -v api_url="$PUBLIC_BASE_URL/auth/v1" \
+  -v site_url="$SITE_URL" \
+  -v redirects="$REDIRECTS" \
+  '
+  BEGIN {
+    order[1] = "SUPABASE_PUBLIC_URL"
+    order[2] = "API_EXTERNAL_URL"
+    order[3] = "SITE_URL"
+    order[4] = "ADDITIONAL_REDIRECT_URLS"
+    order[5] = "DISABLE_SIGNUP"
+    values[order[1]] = public_url
+    values[order[2]] = api_url
+    values[order[3]] = site_url
+    values[order[4]] = redirects
+    values[order[5]] = "false"
+  }
+  {
+    separator = index($0, "=")
+    key = separator > 0 ? substr($0, 1, separator - 1) : ""
+    if (key in values) {
+      if (!seen[key]) print key "=" values[key]
+      seen[key] = 1
       next
     }
-    { print }
-    END {
-      if (!replaced) print key "=" value
+    print
+  }
+  END {
+    for (position = 1; position <= 5; position += 1) {
+      key = order[position]
+      if (!seen[key]) print key "=" values[key]
     }
-  ' "$ENV_FILE" > "$temp_file"
-  chmod 0600 "$temp_file"
-  mv "$temp_file" "$ENV_FILE"
-}
+  }
+  ' "$ENV_FILE" > "$TEMP_FILE"
 
-set_env_value SUPABASE_PUBLIC_URL "$PUBLIC_BASE_URL"
-set_env_value API_EXTERNAL_URL "$PUBLIC_BASE_URL/auth/v1"
-set_env_value SITE_URL "$SITE_URL"
-set_env_value ADDITIONAL_REDIRECT_URLS "$REDIRECTS"
-set_env_value DISABLE_SIGNUP false
+chmod 0600 "$TEMP_FILE"
+mv "$TEMP_FILE" "$ENV_FILE"
+trap - EXIT
 
 printf '公网 URL 配置已写入，备份位于 %s\n' "$BACKUP_FILE"

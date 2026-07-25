@@ -28,6 +28,16 @@ const MIN_PAGE_TEXT_LENGTH = 40;
 const MAX_BROWSER_OCR_PAGES = 40;
 const FALLBACK_WARNING = '已使用备用网页识别服务，请在预览中检查标题和正文';
 
+class ContentExtractorError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ContentExtractorError';
+    this.status = status;
+  }
+}
+
 type ContentImportEnv = {
   DEV?: boolean;
   VITE_SUPABASE_URL?: string;
@@ -201,7 +211,9 @@ async function fetchViaExtractor(
     body: JSON.stringify({ url }),
   });
   const data = await response.json().catch(() => ({})) as { title?: string; content?: string; error?: string };
-  if (!response.ok || !data.content) throw new Error(data.error || '网页正文提取失败');
+  if (!response.ok || !data.content) {
+    throw new ContentExtractorError(data.error || '网页正文提取失败', response.status);
+  }
   return { title: data.title || new URL(url).hostname, content: data.content };
 }
 
@@ -237,7 +249,14 @@ export async function extractUrlContent(
   if (extractorUrl) {
     try {
       result = await fetchViaExtractor(url, env, accessToken);
-    } catch {
+    } catch (error) {
+      if (
+        accessToken
+        || !(error instanceof ContentExtractorError)
+        || error.status !== 401
+      ) {
+        throw error;
+      }
       report(onProgress, { stage: 'fetching', message: '正在尝试备用识别方式...', progress: 0.6 });
       result = await fetchViaReader(url);
       warnings.push(FALLBACK_WARNING);
