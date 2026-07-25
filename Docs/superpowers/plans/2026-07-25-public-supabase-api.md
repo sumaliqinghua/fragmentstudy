@@ -490,11 +490,11 @@ the rollback path during that migration.
 - Produces: launchd backup through the same non-root public SSH route
 - Preserves: Tailscale Serve `:8443` as an optional API rollback
 
-- [ ] **Step 1: Back up SSH and firewall configuration**
+- [x] **Step 1: Back up SSH and firewall configuration**
 
 Create a mode-`0700` timestamped directory and archive `/etc/ssh`, relevant systemd overrides, and `ufw status numbered`. Do not copy private host keys off the VPS.
 
-- [ ] **Step 2: Create `fragmentops`**
+- [x] **Step 2: Create `fragmentops`**
 
 Create the user with `/bin/bash`, install the existing Mac ed25519 public key as mode `0600`, and create a mode-`0440` sudoers rule:
 
@@ -504,7 +504,7 @@ fragmentops ALL=(ALL:ALL) NOPASSWD:ALL
 
 Validate with `visudo -cf /etc/sudoers.d/fragmentops`.
 
-- [ ] **Step 3: Enable dual SSH listeners**
+- [x] **Step 3: Enable dual SSH listeners**
 
 Configure the observed current ports plus `2222`, disable password and keyboard-interactive authentication, set `PermitRootLogin no`, and restrict allowed users to `fragmentops`.
 
@@ -516,7 +516,7 @@ systemctl reload ssh
 ss -lntp | grep -E ':(443|2222)\b'
 ```
 
-- [ ] **Step 4: Open and test port 2222**
+- [x] **Step 4: Open and test port 2222**
 
 Allow TCP `2222` in UFW if UFW is active. From a separate Mac process:
 
@@ -531,7 +531,7 @@ ssh -i ~/.ssh/id_ed25519 \
 
 Expected: exit `0`.
 
-- [ ] **Step 5: Migrate and verify automated backup**
+- [x] **Step 5: Migrate and verify automated backup**
 
 Install the committed `backup-private.sh` as `~/.local/bin/fragmentarticle-supabase-backup`. Update the existing `fragmentarticle-backup` SSH alias to:
 
@@ -545,17 +545,23 @@ BatchMode yes
 
 The backup script uses `sudo -n` for Docker and root-owned configuration reads. Trigger the LaunchAgent, require exit code `0`, confirm a new three-file snapshot, and run `pg_restore --list`.
 
-- [ ] **Step 6: Verify negative cases**
+- [x] **Step 6: Verify negative cases**
 
 Confirm password authentication is unavailable and public root login on `2222` is rejected. Keep the original root `443` session open until these checks pass.
 
-- [ ] **Step 7: Remove SSH from 22 and 443**
+- [x] **Step 7: Remove SSH from 22 and 443**
 
 Only after Steps 4-6 pass, remove `22` and `443` from the effective SSH listener, validate with `sshd -t`, reload, and confirm:
 
 - `2222` still accepts `fragmentops`;
 - `22` and `443` no longer belong to sshd;
 - the public non-root backup route remains usable.
+
+Result: SSH configuration and firewall state were archived on the VPS,
+`fragmentops` key-only sudo access was verified from fresh public and
+Tailscale sessions, password and root login were rejected, the LaunchAgent
+created a fresh three-file encrypted snapshot through the public alias, and
+sshd now listens only on `2222`.
 
 ---
 
@@ -571,7 +577,7 @@ Only after Steps 4-6 pass, remove `22` and `443` from the effective SSH listener
 - Proxies: approved Supabase API paths to `127.0.0.1:8000`
 - Rejects: root, Studio, Meta, Storage, Realtime, and unknown paths
 
-- [ ] **Step 1: Install Caddy and stage configuration**
+- [x] **Step 1: Install Caddy and stage configuration**
 
 Install Caddy from its official Ubuntu repository:
 
@@ -590,7 +596,7 @@ sudo apt-get install -y caddy
 
 Copy the committed `infra/supabase/Caddyfile.public` to `/etc/caddy/Caddyfile` as root.
 
-- [ ] **Step 2: Validate before starting**
+- [x] **Step 2: Validate before starting**
 
 Run:
 
@@ -601,11 +607,11 @@ caddy validate --config /etc/caddy/Caddyfile
 
 Expected: valid configuration.
 
-- [ ] **Step 3: Open HTTP/HTTPS and start Caddy**
+- [x] **Step 3: Open HTTP/HTTPS and start Caddy**
 
 Allow `80/tcp` and `443/tcp` in UFW if active, enable Caddy, and wait for certificate issuance.
 
-- [ ] **Step 4: Verify routing before Supabase URL mutation**
+- [x] **Step 4: Verify routing before Supabase URL mutation**
 
 Confirm:
 
@@ -615,9 +621,19 @@ Confirm:
 - Studio is not reachable;
 - Caddy logs do not contain Authorization or request bodies.
 
-- [ ] **Step 5: Roll back on failure**
+- [x] **Step 5: Preserve the rollback path**
 
-If certificate issuance or routing fails, stop Caddy, keep SSH on `2222`, and continue using Tailscale `:8443`. Do not return SSH to `443` unless a separate recovery need is proven.
+Certificate issuance and server-side routing passed, so rollback was not
+invoked. If a later failure occurs, stop Caddy, keep SSH on `2222`, and
+continue using Tailscale `:8443`. Do not return SSH to `443` unless a
+separate recovery need is proven.
+
+Reachability note: the VPS and Let's Encrypt validators complete TLS, but the
+current mainland China network resets HTTP Host and TLS SNI traffic for
+`api.iamchatgpt.top` before it reaches Caddy. TCP to the same IP and neutral
+SNI remain reachable. The deployed endpoint is valid outside that filtering
+path; domestic release requires a neutral domain without `chatgpt` in its
+hostname. Cloudflare does not remove the client-visible SNI.
 
 ---
 
@@ -635,7 +651,7 @@ If certificate issuance or routing fails, stop Caddy, keep SSH on `2222`, and co
 - App callback: `fragmentarticle://auth/callback`
 - Public signup: temporarily enabled for owner bootstrap, then disabled
 
-- [ ] **Step 1: Run the complete local verification before deployment**
+- [x] **Step 1: Run the complete local verification before deployment**
 
 Run:
 
@@ -651,11 +667,11 @@ git diff --check
 
 Expected: tests/typecheck/build/shell checks pass; lint has zero errors and any existing warnings are recorded.
 
-- [ ] **Step 2: Commit all deployable artifacts**
+- [x] **Step 2: Commit all deployable artifacts**
 
 Confirm `git status` is clean and note the exact revision. Sync only that revision using `scripts/supabase/sync-project.sh`.
 
-- [ ] **Step 3: Apply public URL configuration**
+- [x] **Step 3: Apply public URL configuration**
 
 Run the committed configuration script with:
 
@@ -668,15 +684,19 @@ install root: /opt/fragment-article/supabase
 
 Keep `DISABLE_SIGNUP=false` for owner bootstrap.
 
-- [ ] **Step 4: Recreate only affected services**
+- [x] **Step 4: Recreate only affected services**
 
 Recreate `auth`, `studio`, and `functions` with the private Compose override and wait for health. Do not start Storage, Realtime, imgproxy, Analytics, or Vector.
 
-- [ ] **Step 5: Update local development target**
+- [x] **Step 5: Keep the reachable local development target**
 
-Set ignored `.env.local` to use `https://api.iamchatgpt.top` as the network URL while preserving `/supabase-proxy` as the browser URL. Never place the AI Key in a `VITE_*` variable.
+The domestic Host/SNI reset discovered during live verification makes the
+public hostname unusable from the current Mac network. Keep ignored
+`.env.local` on the working Tailscale URL and preserve `/supabase-proxy` as
+the browser URL until a neutral public domain is configured. Never place the
+AI Key in a `VITE_*` variable.
 
-- [ ] **Step 6: Run public functional acceptance**
+- [x] **Step 6: Run public functional acceptance**
 
 Verify:
 
@@ -689,7 +709,7 @@ Verify:
 - root and Studio routes return `404`;
 - no secret/token/body leakage in logs.
 
-- [ ] **Step 7: Bootstrap the owner and close signup**
+- [x] **Step 7: Bootstrap the owner and close signup**
 
 If no persistent owner exists, pause only for the user to create the owner account with their private credentials. After login and session restoration pass, set:
 
@@ -699,7 +719,7 @@ DISABLE_SIGNUP=true
 
 Recreate `auth`, then verify a fresh anonymous signup is rejected while the owner can still log in.
 
-- [ ] **Step 8: Re-run infrastructure, database, and backup acceptance**
+- [x] **Step 8: Re-run infrastructure, database, and backup acceptance**
 
 Run:
 
@@ -710,7 +730,7 @@ Run:
 - LaunchAgent backup trigger;
 - latest encrypted dump `pg_restore --list`.
 
-- [ ] **Step 9: Record evidence and commit**
+- [x] **Step 9: Record evidence and commit**
 
 Update both operations documents with:
 
@@ -722,8 +742,25 @@ Update both operations documents with:
 
 Commit using Lore trailers and run the full local verification again from the committed state.
 
-- [ ] **Step 10: Rotate the exposed root recovery password without printing it**
+- [x] **Step 10: Rotate the exposed root recovery password without printing it**
 
 After all public and backup checks pass, generate a new random recovery password locally, store it in macOS Keychain under service `fragmentarticle-racknerd-root-recovery`, pass it to `chpasswd` over the verified `fragmentops` SSH session, then unset the shell variable. Suppress command output and never add the password to a file.
 
 Verify again that SSH password authentication and public root login remain rejected. Record only the rotation date and Keychain service name in documentation.
+
+Deployment evidence (2026-07-26 local date):
+
+- deployed revision `539e23c209c5247c1870cbe6ea2ffea550b43d87`;
+- Caddy `2.11.4`, valid Let's Encrypt certificate, allowlisted paths only;
+- anonymous AI and extraction `401`; authenticated REST, extraction,
+  non-stream AI, and SSE `[DONE]` passed with a disposable account that was
+  deleted afterward;
+- invalid model and client-owned credentials `400`;
+- owner count remains one, signup returns `422`, Auth health returns `200`;
+- eight approved containers healthy, five disabled services absent;
+- 19 migrations, zero database lint errors, RLS `6/6` with rollback;
+- LaunchAgent snapshot `20260725T161804Z` contains three encrypted files and
+  its database dump has a readable 651-line restore list;
+- root recovery password rotated into macOS Keychain service
+  `fragmentarticle-racknerd-root-recovery`; root and password SSH remain
+  rejected.

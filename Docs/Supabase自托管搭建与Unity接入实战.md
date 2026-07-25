@@ -1244,6 +1244,13 @@ Auth callback: fragmentarticle://auth/callback
 
 React Native 工程必须在 iOS 和 Android 中注册同一个 `fragmentarticle` scheme，才能接收 OAuth 或密码重置回调。当前 React 仓库不包含 React Native 原生工程，因此服务器可以验证允许的 redirect URL，但最终 deep link 跳转仍需在 React Native 工程中验收。
 
+2026-07-26 实测发现，VPS 本机和 Let's Encrypt 验证节点可以正常访问该
+域名，但当前中国大陆网络会在请求到达 Caddy 前重置
+`api.iamchatgpt.top` 的 HTTP Host 和 TLS SNI。原因高度集中在域名包含
+`chatgpt`，不是 Caddy、证书或 UFW 故障。国内正式发布应更换不含敏感
+关键词的中性域名；Cloudflare 仍需要客户端发送原域名 SNI，不能可靠规避。
+当前 Mac 的 `.env.local` 继续使用 Tailscale URL，避免本地开发中断。
+
 服务端配置：
 
 ```dotenv
@@ -1257,7 +1264,8 @@ ADDITIONAL_REDIRECT_URLS=fragmentarticle://auth/callback,http://localhost:5174/*
 
 ### 18.3 SSH 迁移顺序
 
-公网 `443` 当前由 SSH 使用，必须按以下顺序迁移：
+公网 SSH 到 Caddy 的迁移已按以下顺序完成；该顺序仍是重建服务器时的
+操作基线：
 
 1. 创建非 root `fragmentops` sudo 用户；
 2. 暂时同时监听 `443` 和 `2222`；
@@ -1304,11 +1312,15 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 
 ## 19. 当前实际进度
 
-截至 2026-07-18 本次远端复核，已经完成并有实测证据的内容：
+截至 2026-07-26，已经完成并有实测证据的内容：
 
-- SSH ed25519 公钥登录 VPS；
+- 部署 revision 为 `539e23c209c5247c1870cbe6ea2ffea550b43d87`；
+- 公网 SSH 只监听 `2222`，仅 `fragmentops` ed25519 公钥登录，root 和密码登录均被拒绝；
+- root recovery password 已轮换，新值只存于 macOS Keychain 服务 `fragmentarticle-racknerd-root-recovery`；
+- UFW 默认拒绝入站，仅放行公网 `80/443/2222` 和 Tailscale 回滚接口；
 - VPS 和 Mac mini 加入同一 Tailscale 网络；
 - Tailscale Serve 私网 HTTPS `:8443` 可达，证书验证通过；
+- Caddy `2.11.4` 和 Let's Encrypt 证书生效，只允许 Auth、REST、Functions；
 - Docker `29.6.2`、Compose `5.3.1`；
 - Supabase CLI `2.72.7`；
 - 官方 Supabase 固定为 `self-hosted/v0.7.0`；
@@ -1318,46 +1330,46 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 - 19 个 migration 已通过 CLI 执行并记录历史；
 - `public` 和 `extensions` 的数据库 lint 通过；
 - RLS 双用户测试 6/6 通过并回滚；
-- 匿名 `openai-proxy` 返回 `401`；
-- 登录用户通过 VPS Function 完成非流式卡片生成和 SSE 流式生成；无效模型和客户端提交 API Key 均被拒绝；
-- `content-extractor` 对公开 MDN 页面返回 `200`；
+- 匿名 `openai-proxy` 和 `content-extractor` 均返回 `401`；
+- 临时登录账号通过 VPS Function 完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；无效模型和客户端提交 API Key 均返回 `400`，验收账号随后删除；
+- 数据库只保留 1 个 owner，公开注册返回 `422`，Auth health 返回 `200`；
 - 浏览器链接导入优先走 `content-extractor`，失败时才降级 Jina；掘金文章的 26 张图片均以真实 `<img>` 渲染；
 - 带文本层 PDF 和扫描 PDF 均完成浏览器提取/OCR，网络记录确认没有 PDF 上传请求；
 - 注册自动确认、退出、重新登录、刷新恢复和登录用户资料持久化通过；
 - 首页重载约 3.3 秒，个人页同步约 2.4 秒；
 - 本地单元测试、typecheck、lint 无 error、生产 build 均通过；
-- Mac 已安装 `age 1.3.1`，手动备份和两次 launchd 触发备份均成功；
-- 最新加密数据库快照解密后，PostgreSQL 17.6 `pg_restore --list` 成功读取 643 个 TOC 条目；
+- Mac 已安装 `age 1.3.1`，LaunchAgent 已迁到 `fragmentops:2222` 并再次成功；
+- 最新快照 `20260725T161804Z` 包含三份 `0600` 密文，数据库密文流式解密后的 PostgreSQL 17.6 `pg_restore --list` 有 651 行；
 - 临时恢复演练验证 2 个 Auth 用户、1 篇资料、19 条迁移和 17 张 RLS 表。
 
-仍未进入当前私网开发阶段的内容：
+仍未进入当前开发阶段的内容：
 
-- 非 root sudo 用户、root 密码轮换、关闭 root 密码登录；
-- 从公网 `443` 移除 SSH；
-- SMTP、正式域名、Caddy 和公网限流；
+- 不含敏感关键词的中性正式域名；
+- SMTP、邮箱确认和密码找回；
+- AI 每用户日额度、调用审计和 `429`；
+- 网页提取的公网 IP 限流与完整 SSRF 回归；
+- 正式平台 AI Key；
 - Supabase Storage、RAG 和向量搜索。
 
-## 20. 公网发布前的硬性门槛
+## 20. 对外用户发布前的硬性门槛
 
-1. 创建非 root sudo 运维用户；
-2. 验证该用户的 SSH 密钥和紧急恢复路径；
-3. 轮换已经暴露过的 root 密码；
-4. 禁止 root 密码登录；
-5. 把管理入口迁移到 Tailscale；
-6. 从公网 `443` 移除 SSH，并恢复标准 HTTPS 使用；
-7. 配置正式域名和 Caddy；
-8. Studio、PostgreSQL、Supavisor 继续只允许私网；
-9. 接入 SMTP，关闭邮箱自动确认；
-10. 增加 AI 每日额度、调用审计和滥用保护；
-11. 完成网页提取的完整 SSRF 防护和 IP 限流；
-12. 确认最近一次加密备份和恢复演练仍通过；
-13. 再部署正式 AI Key 和真实用户数据。
+1. 把 `api.iamchatgpt.top` 换成大陆网络可达的中性域名，并重跑公网验收；
+2. 在 React Native 工程注册 `fragmentarticle` deep link 并完成真机回调；
+3. 接入 SMTP，关闭邮箱自动确认，完成密码找回；
+4. 增加 AI 每日额度、调用审计和滥用保护；
+5. 完成网页提取的完整 SSRF 防护和 IP 限流；
+6. 确认 Studio、PostgreSQL、Supavisor 仍只允许私网；
+7. 确认最近一次加密备份和完整恢复演练仍通过；
+8. 再部署正式 AI Key 和真实用户数据。
 
 ## 21. 命令速查
 
 ```bash
 # SSH
-ssh -i ~/.ssh/id_ed25519 -p 443 root@107.175.95.166
+ssh fragmentarticle-backup
+
+# 等价的显式写法
+ssh -i ~/.ssh/id_ed25519 -p 2222 fragmentops@107.175.95.166
 
 # 初始化官方栈
 sudo scripts/supabase/bootstrap-host.sh /opt/fragment-article/supabase

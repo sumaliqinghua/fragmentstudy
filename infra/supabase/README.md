@@ -153,7 +153,7 @@ sudo systemctl disable caddy
 
 ## Mac 加密备份
 
-Mac 安装 `age` 并生成身份文件后，通过 Tailscale 主动拉取备份：
+Mac 安装 `age` 并生成身份文件后，通过公网非 root SSH 主动拉取备份：
 
 ```bash
 scripts/supabase/backup-private.sh \
@@ -174,7 +174,7 @@ scripts/supabase/backup-private.sh \
 - 备份目录：`~/Backups/fragment-article/supabase`；
 - 每日时间：本机时间 `03:20`。
 
-2026-07-18 的恢复演练从 `.age` 密文流恢复到临时数据库，验证得到 2 个 Auth 用户、1 篇业务资料、19 条迁移记录、17 张启用 RLS 的 public 表和 `auth.uid()` 函数，随后删除临时库。2026-07-21 又通过当前 `fragmentarticle-backup` 通道触发了两次 launchd 备份，均退出码为 0，并生成包含三个密文文件的新快照；最新 `database.dump.age` 解密后由远端 PostgreSQL 17.6 `pg_restore --list` 成功读取 643 个 TOC 条目。恢复必须使用镜像中的 `supabase_admin`；`postgres` 在该固定镜像中不是 superuser，会在恢复 `vault.secrets` 时被拒绝。
+2026-07-18 的恢复演练从 `.age` 密文流恢复到临时数据库，验证得到 2 个 Auth 用户、1 篇业务资料、19 条迁移记录、17 张启用 RLS 的 public 表和 `auth.uid()` 函数，随后删除临时库。2026-07-26 公网切换后，LaunchAgent 通过 `fragmentops:2222` 再次退出码 `0`，快照 `20260725T161804Z` 包含三个密文文件；`database.dump.age` 直接流式解密到 PostgreSQL 17.6 的 `pg_restore --list`，得到 651 行可读目录且未在磁盘落明文。恢复必须使用镜像中的 `supabase_admin`；`postgres` 在该固定镜像中不是 superuser，会在恢复 `vault.secrets` 时被拒绝。
 
 备份完成不等于可恢复。每月至少一次将 dump 恢复到临时 PostgreSQL，检查 Auth、业务表、迁移历史和 RLS。
 
@@ -193,19 +193,41 @@ scripts/supabase/backup-private.sh \
 - 首页重复远程用户校验已移除，实测重载约 3.3 秒、个人页同步约 2.4 秒；
 - Mac 加密备份、两次 launchd 触发和 `supabase_admin` 临时恢复演练通过；当前继续使用 `.env` 中已有开发 Key，不更换 Key。
 
+## 2026-07-26 公网验收记录
+
+部署 revision：
+
+```text
+539e23c209c5247c1870cbe6ea2ffea550b43d87
+```
+
+已通过：
+
+- SSH 只监听 `2222`，仅 `fragmentops` 可用 ed25519 公钥登录并执行 `sudo -n`；root 和密码登录均被拒绝；
+- UFW 默认拒绝入站，仅放行公网 `80/443/2222` 和 Tailscale 回滚接口；
+- Caddy `2.11.4` 与 Let's Encrypt 证书有效，只代理 Auth、REST 和 Functions；根路径与 Studio 返回 `404`；
+- `auth`、`studio`、`functions` 只按需重建，8 个批准容器健康，5 个禁用服务缺席；
+- 匿名 `openai-proxy` 与 `content-extractor` 返回 `401`；
+- 临时登录账号完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；非法模型和客户端自带 Key 返回 `400`，账号随后删除；
+- 数据库仍只有 1 个 owner 用户，公开注册已关闭并返回 `422`，Auth health 返回 `200`；
+- 19 条迁移无待应用项，数据库 lint 零错误，RLS `6/6` 通过后回滚；
+- root recovery password 已轮换，新值仅存于 macOS Keychain 服务 `fragmentarticle-racknerd-root-recovery`。
+
+国内网络风险：VPS 本机和 Let's Encrypt 验证节点访问
+`api.iamchatgpt.top` 正常，但当前中国大陆网络会在请求到达 Caddy 前重置
+该域名的 HTTP Host 和 TLS SNI；同一 IP 的 TCP 与中性 SNI 可达。正式国内
+发布必须换用不含 `chatgpt` 的中性域名。Cloudflare 代理不会隐藏客户端
+可见的 SNI，因此不能作为这个问题的可靠修复。本机 `.env.local` 暂时继续
+使用 Tailscale 私网 URL。
+
 ## 已明确延期的事项
 
-以下事项在私网开发阶段不执行，但属于公网发布阻断项：
-
-- 创建非 root sudo 用户、轮换已暴露密码、关闭 root 密码登录；
-- 从公网 `443` 移除 SSH；
-- DNS、Caddy 和正式 HTTPS；
+- 中性公网域名及 React Native/Web 客户端切换；
 - SMTP、邮箱确认和密码找回；
-- 数据库级 AI 日额度与调用审计；
+- 数据库级 AI 日额度、调用审计和 `429`；
 - 网页提取的公网 IP 限流及完整 SSRF 回归；
 - 正式平台 AI Key；
 - Supabase Storage、原始 PDF 存储、RAG 和向量索引。
 
-自动备份调度、一次手动备份、两次 launchd 触发备份、密文目录检查和临时恢复演练已经完成。后续升级 Supabase 镜像时必须重新验证恢复角色和完整恢复流程。
-
-私网开发阶段继续使用当前开发 Key；不要在登录加固前放置正式 Key 或真实用户数据。
+后续升级 Supabase 镜像时必须重新验证恢复角色和完整恢复流程。当前继续
+使用 `.env` 中已有的开发 AI Key，不更换 Key，也不把它下发到客户端。
