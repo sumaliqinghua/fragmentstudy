@@ -361,11 +361,11 @@ Use a Lore commit that records why the Kong root route and Studio are deliberate
 **Interfaces:**
 - Documents the exact public endpoint, React Native scheme, SSH role split, Caddy route allowlist, owner bootstrap, rollback, and deferred items
 
-- [ ] **Step 1: Add the public architecture and migration order**
+- [x] **Step 1: Add the public architecture and migration order**
 
 Explain why SSH must move before Caddy, why Tailscale remains, and why Cloudflare is deferred.
 
-- [ ] **Step 2: Add React Native examples**
+- [x] **Step 2: Add React Native examples**
 
 Include:
 
@@ -376,7 +376,7 @@ Auth callback: fragmentarticle://auth/callback
 
 Document that the React Native repository must register the same scheme in iOS and Android configuration before OAuth or password-reset deep links can be accepted.
 
-- [ ] **Step 3: Add operational security guidance**
+- [x] **Step 3: Add operational security guidance**
 
 Document:
 
@@ -385,7 +385,7 @@ Document:
 - external users remain blocked until quotas, audit, and SMTP exist;
 - Storage, Realtime, RAG, and Cloudflare remain deferred.
 
-- [ ] **Step 4: Run documentation checks and commit**
+- [x] **Step 4: Run documentation checks and commit**
 
 Run:
 

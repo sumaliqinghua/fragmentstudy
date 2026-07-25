@@ -1181,7 +1181,119 @@ docker logs --tail 100 supabase-auth
 docker logs --tail 100 supabase-edge-functions
 ```
 
-## 18. 当前实际进度
+## 18. React Native 公网 API
+
+### 18.1 最小公网架构
+
+本阶段没有正式 Web 前端。React Native 只需要一个稳定的 Supabase API 根地址：
+
+```text
+React Native
+    |
+    | HTTPS 443
+    v
+api.iamchatgpt.top
+    |
+    v
+Caddy
+    |
+    | 仅批准路径
+    v
+127.0.0.1:8000 Kong
+```
+
+Caddy 只允许：
+
+```text
+/auth/v1/*
+/rest/v1/*
+/functions/v1/*
+```
+
+根路径、Studio、Meta、Storage、Realtime 和未知路径返回 `404`。Caddy 不启用站点访问日志，避免 Auth 查询参数中的一次性 code 被记录；服务错误通过 `journalctl -u caddy` 检查。
+
+公网端口边界：
+
+| 端口 | 用途 | 公网状态 |
+| --- | --- | --- |
+| `80` | ACME 与 HTTPS 跳转 | 开放 |
+| `443` | Caddy HTTPS | 开放 |
+| `2222` | 非 root SSH | 仅密钥 |
+| `8000` | Kong 原始入口 | 回环 |
+| `5432` | PostgreSQL/Supavisor | 回环 |
+| `6543` | Supavisor transaction | 回环 |
+| `8443` | Tailscale Serve | tailnet only |
+
+### 18.2 React Native 配置
+
+客户端使用：
+
+```text
+Supabase URL: https://api.iamchatgpt.top
+Auth callback: fragmentarticle://auth/callback
+```
+
+React Native 工程必须在 iOS 和 Android 中注册同一个 `fragmentarticle` scheme，才能接收 OAuth 或密码重置回调。当前 React 仓库不包含 React Native 原生工程，因此服务器可以验证允许的 redirect URL，但最终 deep link 跳转仍需在 React Native 工程中验收。
+
+服务端配置：
+
+```dotenv
+SUPABASE_PUBLIC_URL=https://api.iamchatgpt.top
+API_EXTERNAL_URL=https://api.iamchatgpt.top/auth/v1
+SITE_URL=fragmentarticle://auth/callback
+ADDITIONAL_REDIRECT_URLS=fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://iamchatgpt.top/**,https://www.iamchatgpt.top/**
+```
+
+客户端只能持有 anon key。AI Key、service-role key、JWT secret 和数据库密码仍只存在 VPS。
+
+### 18.3 SSH 迁移顺序
+
+公网 `443` 当前由 SSH 使用，必须按以下顺序迁移：
+
+1. 创建非 root `fragmentops` sudo 用户；
+2. 暂时同时监听 `443` 和 `2222`；
+3. 从 Mac 新建 `fragmentops@107.175.95.166:2222` 密钥连接；
+4. 验证 `sudo -n true`；
+5. 禁止密码和 keyboard-interactive 登录；
+6. 公网 root 登录必须失败；
+7. root 公钥仅保留在 Tailscale 地址范围，避免现有备份中断；
+8. 移除 SSH `443`；
+9. 再让 Caddy 监听 `80/443`。
+
+任何一步失败都不能提前释放 `443`。已经暴露过的 root recovery password 在公网和备份验收完成后轮换，新值只存入 macOS Keychain，不写入仓库或文档。
+
+### 18.4 Auth 与网页提取
+
+当前只供所有者本人使用：
+
+1. 公网入口上线后创建或确认所有者账号；
+2. 验证登录、session 恢复和退出；
+3. 立即设置 `DISABLE_SIGNUP=true` 并重建 Auth；
+4. 验证新注册被拒绝、已有所有者仍可登录。
+
+`openai-proxy` 和 `content-extractor` 都要求真实用户 access token。客户端请求仍同时带 anon `apikey`，但 `Authorization` 必须是用户 token。访客网页导入可以降级到 Jina Reader，不能匿名调用 VPS 抓取服务。
+
+面向外部用户开放前，必须补齐 SMTP、密码找回、AI 每用户日额度、调用审计和 `429`；Cloudflare 不能替代这些应用层限制。
+
+### 18.5 部署和回滚
+
+公网部署必须从干净、已提交的 revision 同步。仓库提供：
+
+- `infra/supabase/Caddyfile.public`：公网路径 allowlist；
+- `scripts/supabase/configure-public-url.sh`：原子更新 URL 并备份 `.env`；
+- `scripts/supabase/verify-public.sh`：验证 DNS、TLS、匿名拒绝与端口边界。
+
+若 Caddy、TLS 或 Supabase URL 切换失败：
+
+1. 停止 Caddy；
+2. 从 `backups/public-rollout` 恢复 `.env`；
+3. 只重建 `auth`、`studio` 和 `functions`；
+4. 继续使用 Tailscale `:8443`；
+5. 保持 SSH `2222`，不要因为 Caddy 故障自动改回 `443`。
+
+Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG 都是后续独立阶段。
+
+## 19. 当前实际进度
 
 截至 2026-07-18 本次远端复核，已经完成并有实测证据的内容：
 
@@ -1216,7 +1328,7 @@ docker logs --tail 100 supabase-edge-functions
 - SMTP、正式域名、Caddy 和公网限流；
 - Supabase Storage、RAG 和向量搜索。
 
-## 19. 公网发布前的硬性门槛
+## 20. 公网发布前的硬性门槛
 
 1. 创建非 root sudo 运维用户；
 2. 验证该用户的 SSH 密钥和紧急恢复路径；
@@ -1232,7 +1344,7 @@ docker logs --tail 100 supabase-edge-functions
 12. 确认最近一次加密备份和恢复演练仍通过；
 13. 再部署正式 AI Key 和真实用户数据。
 
-## 20. 命令速查
+## 21. 命令速查
 
 ```bash
 # SSH
@@ -1268,7 +1380,7 @@ docker compose --env-file .env \
   -f docker-compose.private.yml ps
 ```
 
-## 21. 术语表
+## 22. 术语表
 
 | 术语 | 简单解释 |
 | --- | --- |
@@ -1295,7 +1407,7 @@ docker compose --env-file .env \
 | SMTP | 发送注册确认和密码重置邮件的服务 |
 | RAG | 先检索相关资料，再让模型基于资料回答 |
 
-## 22. 对应仓库资料
+## 23. 对应仓库资料
 
 - `infra/supabase/README.md`：简版日常运维说明；
 - `infra/supabase/docker-compose.private.yml`：私网端口和日志覆盖；
