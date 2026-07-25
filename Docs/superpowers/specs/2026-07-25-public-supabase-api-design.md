@@ -21,7 +21,7 @@ https://api.iamchatgpt.top
 - 创建非 root sudo 运维用户；
 - 公网 SSH 迁移到 `2222`，仅允许密钥登录；
 - 新 SSH 通道验证成功后才释放当前公网 `443`；
-- Tailscale 暂时保留，继续承担运维回退和现有备份通道；
+- Tailscale 暂时保留为可选运维回退；自动备份迁移到公网非 root SSH `2222`，不再依赖 Mac 持续运行 Tailscale；
 - 继续使用现有开发 AI Key，不轮换，也不写入客户端；
 - 当前仅供所有者本人使用，所有者账号建立后关闭公开注册。
 
@@ -89,9 +89,10 @@ Caddy 不把整个 Kong 根路由直接暴露到公网。只允许 Auth、REST �
 4. 从 Mac 建立一条全新的 `2222` 登录并验证 sudo；
 5. 禁止 SSH 密码登录；
 6. 限制公网只允许非 root 运维用户；
-7. root 公钥登录只保留在 Tailscale 地址范围，用于当前备份过渡；
-8. 再从 SSH 监听中移除 `443`；
-9. 验证 `2222` 登录仍正常后，才启动 Caddy。
+7. 禁止 SSH root 登录；
+8. 把自动备份 alias 迁移到 `fragmentops@107.175.95.166:2222`，并验证 `sudo -n` 备份成功；
+9. 再从 SSH 监听中移除 `443`；
+10. 验证 `2222` 登录仍正常后，才启动 Caddy。
 
 用户在对话中提供过的 root 密码不得进入文件、命令参数、日志或 Git。公网切换完成后需要轮换该密码，即使密码登录已经关闭。
 
@@ -204,7 +205,7 @@ Auth callback: fragmentarticle://auth/callback
 
 - 新运维用户通过 `2222` 密钥登录并可 sudo；
 - 公网 root 登录被拒绝；
-- launchd 加密备份继续成功；
+- launchd 通过 `fragmentops:2222` 完成加密备份；
 - 最新密文可通过 `pg_restore --list` 读取。
 
 ## 11. 本阶段不做

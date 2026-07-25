@@ -13,7 +13,7 @@
 - Keep the existing development AI Key unchanged and server-only.
 - Never write passwords, AI keys, JWT secrets, service-role keys, database passwords, or age identities to Git or command output.
 - Never remove SSH port `443` until a fresh `fragmentops@107.175.95.166:2222` key-only session and sudo command both succeed.
-- Keep Tailscale `:8443` and the existing backup alias active throughout this rollout.
+- Keep Tailscale `:8443` as an optional rollback entry; migrate the existing backup alias to `fragmentops:2222` before releasing SSH `443`.
 - Publicly expose only `80`, `443`, and `2222`; keep `8000`, `5432`, and `6543` loopback-only.
 - Keep Storage, Realtime, RAG, pgvector, Cloudflare proxying, and public registration out of scope.
 - Use `fragmentarticle://auth/callback` for React Native Auth redirects.
@@ -413,7 +413,7 @@ Commit using the Lore protocol.
 - Produces: a preflight record containing no secrets
 - Blocks all mutation if DNS, backup, service health, or SSH prerequisites fail
 
-- [ ] **Step 1: Verify DNS and current endpoints**
+- [x] **Step 1: Verify DNS and current endpoints**
 
 Run from the Mac:
 
@@ -429,7 +429,7 @@ unset anon
 
 Expected: DNS includes `107.175.95.166`, private health succeeds with the required anon header during the actual check, and SSH exits `0`.
 
-- [ ] **Step 2: Inspect SSH and firewall activation**
+- [x] **Step 2: Inspect SSH and firewall activation**
 
 Read without changing:
 
@@ -445,7 +445,7 @@ ufw status verbose
 
 Choose the service/socket configuration path from observed state; do not assume `Port` directives alone control the listener.
 
-- [ ] **Step 3: Verify Supabase and backups**
+- [x] **Step 3: Verify Supabase and backups**
 
 Verify:
 
@@ -455,26 +455,40 @@ Verify:
 - migration count is 19;
 - database lint has no errors;
 - RLS 6/6 passes and rolls back;
-- LaunchAgent last exit code is 0;
-- latest encrypted dump produces a valid `pg_restore --list`.
+- latest encrypted dump produces a valid `pg_restore --list`;
+- if the current LaunchAgent fails only because Mac Tailscale is stopped, Task 6 must migrate and verify the backup alias before releasing `443`.
 
-- [ ] **Step 4: Record the go/no-go result**
+- [x] **Step 4: Record the go/no-go result**
 
 Proceed only if all preflight checks pass. Any discrepancy becomes a documented blocker with no remote mutation.
+
+Preflight result (2026-07-25): GO. DNS resolves to the VPS, private Auth
+health and root key SSH on the temporary public `443` listener succeed, the
+approved eight containers are healthy, disabled services are absent,
+database ports remain loopback-only, all 19 migrations are present, database
+lint and the six RLS rollback checks pass, and the latest encrypted database
+dump has a readable PostgreSQL restore list. The existing LaunchAgent route
+was the only unavailable check while Mac Tailscale was stopped; Task 6 owns
+its migration to `fragmentops:2222` and must produce a fresh verified backup
+before releasing SSH `443`. Tailscale has since been restarted and remains
+the rollback path during that migration.
 
 ---
 
 ### Task 6: Migrate SSH Safely to Non-Root Port 2222
 
 **Files:**
-- Remote create: `/etc/ssh/sshd_config.d/60-fragmentarticle-public.conf`
+- Remote create: `/etc/ssh/sshd_config.d/00-fragmentarticle-public.conf`
 - Remote create: `/etc/sudoers.d/fragmentops`
 - Remote modify only if required by observed state: systemd SSH socket override
 - Remote backup: existing SSH configuration under `/root/fragmentarticle-rollout/<UTC timestamp>/`
+- Local modify: `~/.ssh/config` backup alias target
+- Local install: `~/.local/bin/fragmentarticle-supabase-backup`
 
 **Interfaces:**
 - Produces: `fragmentops@107.175.95.166:2222` key-only sudo access
-- Preserves: root key access through Tailscale for the existing backup path
+- Produces: launchd backup through the same non-root public SSH route
+- Preserves: Tailscale Serve `:8443` as an optional API rollback
 
 - [ ] **Step 1: Back up SSH and firewall configuration**
 
@@ -492,7 +506,7 @@ Validate with `visudo -cf /etc/sudoers.d/fragmentops`.
 
 - [ ] **Step 3: Enable dual SSH listeners**
 
-Configure `443` and `2222`, disable password and keyboard-interactive authentication, and restrict allowed users so public root login is not accepted while Tailscale root key access remains available.
+Configure the observed current ports plus `2222`, disable password and keyboard-interactive authentication, set `PermitRootLogin no`, and restrict allowed users to `fragmentops`.
 
 Validate using:
 
@@ -517,17 +531,31 @@ ssh -i ~/.ssh/id_ed25519 \
 
 Expected: exit `0`.
 
-- [ ] **Step 5: Verify negative cases**
+- [ ] **Step 5: Migrate and verify automated backup**
+
+Install the committed `backup-private.sh` as `~/.local/bin/fragmentarticle-supabase-backup`. Update the existing `fragmentarticle-backup` SSH alias to:
+
+```text
+HostName 107.175.95.166
+User fragmentops
+Port 2222
+IdentityFile ~/.ssh/id_ed25519
+BatchMode yes
+```
+
+The backup script uses `sudo -n` for Docker and root-owned configuration reads. Trigger the LaunchAgent, require exit code `0`, confirm a new three-file snapshot, and run `pg_restore --list`.
+
+- [ ] **Step 6: Verify negative cases**
 
 Confirm password authentication is unavailable and public root login on `2222` is rejected. Keep the original root `443` session open until these checks pass.
 
-- [ ] **Step 6: Remove SSH from 443**
+- [ ] **Step 7: Remove SSH from 22 and 443**
 
-Only after Step 4 passes, remove `443` from the effective SSH listener, validate with `sshd -t`, reload, and confirm:
+Only after Steps 4-6 pass, remove `22` and `443` from the effective SSH listener, validate with `sshd -t`, reload, and confirm:
 
 - `2222` still accepts `fragmentops`;
-- `443` no longer belongs to sshd;
-- Tailscale backup SSH remains usable through its configured route.
+- `22` and `443` no longer belong to sshd;
+- the public non-root backup route remains usable.
 
 ---
 

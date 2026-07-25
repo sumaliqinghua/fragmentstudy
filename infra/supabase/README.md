@@ -165,7 +165,7 @@ scripts/supabase/backup-private.sh \
 
 数据库 dump 和配置归档从 SSH 流直接进入本机 `age`，不会在 Mac 落地明文。默认保留 14 个每日、8 个每周和 6 个月度副本。`com.fragmentarticle.supabase-backup.plist.example` 是 launchd 模板，安装前必须替换其中占位符并使用绝对路径。
 
-备份脚本强制使用 SSH `BatchMode`，因此 launchd 不会停在密码提示上。当前 Mac 通过 `~/.ssh/config` 中的 `fragmentarticle-backup` alias，经 Tailscale IPv4 `100.84.96.100:443` 使用现有 ed25519 密钥非交互连接 VPS；这里使用标准 OpenSSH 通道，不依赖会触发网页复核的 Tailscale SSH。本机 age 身份存放在 `~/.config/fragment-article/backup-age-key.txt`，权限必须保持为 `0600`，不得提交或复制到 VPS。
+备份脚本强制使用 SSH `BatchMode` 和远端 `sudo -n`，因此 launchd 不会停在密码提示上。公网迁移后，`~/.ssh/config` 中的 `fragmentarticle-backup` alias 指向 `fragmentops@107.175.95.166:2222`，使用现有 ed25519 密钥；自动备份不再依赖 Mac 上的 Tailscale 运行状态。本机 age 身份存放在 `~/.config/fragment-article/backup-age-key.txt`，权限必须保持为 `0600`，不得提交或复制到 VPS。
 
 实际定时任务使用以下稳定路径，不依赖临时 Git worktree：
 

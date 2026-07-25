@@ -44,7 +44,7 @@ set -euo pipefail
 install_root="$1"
 cd "$install_root/docker"
 test -f docker-compose.yml
-docker compose --env-file .env -f docker-compose.yml -f docker-compose.private.yml \
+sudo -n docker compose --env-file .env -f docker-compose.yml -f docker-compose.private.yml \
   exec -T db pg_dump -U postgres -d postgres -Fc
 REMOTE_DB
 
@@ -58,11 +58,11 @@ files=(docker/.env docker/docker-compose.private.yml)
 if test -f project/REVISION; then
   files+=(project/REVISION)
 fi
-tar -cf - "${files[@]}"
+sudo -n tar -cf - "${files[@]}"
 REMOTE_CONFIG
 
 ssh -o BatchMode=yes -o ServerAliveInterval=30 "$SSH_TARGET" \
-  docker exec supabase-db tar -C /etc/postgresql-custom -cf - . \
+  sudo -n docker exec supabase-db tar -C /etc/postgresql-custom -cf - . \
   | age -r "$AGE_RECIPIENT" -o "$TMP_DIR/db-config.tar.age"
 
 chmod 0600 "$TMP_DIR"/*.age

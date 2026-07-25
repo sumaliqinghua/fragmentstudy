@@ -1046,7 +1046,9 @@ chmod 600 ~/.config/fragment-article/backup-age-key.txt
 
 ### 15.3 执行备份
 
-当前 Mac 通过 `fragmentarticle-backup` SSH alias，经 Tailscale IPv4 的标准 OpenSSH `443` 端口非交互连接 VPS。先验证：
+公网切换后，Mac 通过 `fragmentarticle-backup` SSH alias，以
+`fragmentops@107.175.95.166:2222` 密钥登录方式非交互连接 VPS。
+Tailscale 仅保留为运维回滚入口，不再是定时备份的前置条件。先验证：
 
 ```bash
 ssh fragmentarticle-backup true
@@ -1064,7 +1066,14 @@ scripts/supabase/backup-private.sh \
 
 自动任务必须始终先验证 `BatchMode=yes` 能无交互连接。实际定时任务使用稳定脚本 `~/.local/bin/fragmentarticle-supabase-backup`，而不是依赖可能被删除的临时 Git worktree。
 
-当前已加载的 LaunchAgent 是 `~/Library/LaunchAgents/com.fragmentarticle.supabase-backup.plist`，每天本机时间 `03:20` 运行，备份写入 `~/Backups/fragment-article/supabase`。`~/.ssh/config` 中的 `fragmentarticle-backup` 指向 `100.84.96.100:443`，使用现有 ed25519 密钥和 `BatchMode=yes`；两次最近的 launchd 触发均返回退出码 0，并生成了新的三文件快照。
+当前已加载的 LaunchAgent 是
+`~/Library/LaunchAgents/com.fragmentarticle.supabase-backup.plist`，每天本机时间
+`03:20` 运行，备份写入 `~/Backups/fragment-article/supabase`。
+`~/.ssh/config` 中的 `fragmentarticle-backup` 应指向公网
+`fragmentops@107.175.95.166:2222`，使用现有 ed25519 密钥和
+`BatchMode=yes`。首次迁移必须手动触发 LaunchAgent，确认退出码为 `0`、
+生成新的三文件快照，并通过 `pg_restore --list` 检查后，才能释放 SSH
+`443`。
 
 ### 15.4 解密检查
 
@@ -1256,8 +1265,8 @@ ADDITIONAL_REDIRECT_URLS=fragmentarticle://auth/callback,http://localhost:5174/*
 4. 验证 `sudo -n true`；
 5. 禁止密码和 keyboard-interactive 登录；
 6. 公网 root 登录必须失败；
-7. root 公钥仅保留在 Tailscale 地址范围，避免现有备份中断；
-8. 移除 SSH `443`；
+7. 自动备份迁移到 `fragmentops@107.175.95.166:2222`，并验证新快照；
+8. 移除 SSH `22/443`；
 9. 再让 Caddy 监听 `80/443`。
 
 任何一步失败都不能提前释放 `443`。已经暴露过的 root recovery password 在公网和备份验收完成后轮换，新值只存入 macOS Keychain，不写入仓库或文档。
