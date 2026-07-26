@@ -33,7 +33,8 @@ for path in \
   supabase/migrations \
   supabase/tests \
   supabase/functions/content-extractor \
-  supabase/functions/openai-proxy
+  supabase/functions/openai-proxy \
+  supabase/functions/markdown-ai-proxy
 do
   [[ -n "$(git -C "$PROJECT_ROOT" ls-tree -d --name-only HEAD "$path")" ]] \
     || fail "当前 revision 缺少 $path"
@@ -53,7 +54,7 @@ install -d -m 0755 "$PROJECT_DEST" "$FUNCTIONS_DEST"
 rsync -a --delete "$TMP_DIR/supabase/migrations/" "$PROJECT_DEST/migrations/"
 rsync -a --delete "$TMP_DIR/supabase/tests/" "$PROJECT_DEST/tests/"
 
-for function_dir in content-extractor openai-proxy _shared; do
+for function_dir in content-extractor openai-proxy markdown-ai-proxy _shared; do
   if [[ -d "$TMP_DIR/supabase/functions/$function_dir" ]]; then
     rsync -a --delete \
       --exclude='.env' --exclude='.env.*' \
