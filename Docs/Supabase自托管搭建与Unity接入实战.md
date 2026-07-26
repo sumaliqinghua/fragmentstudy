@@ -1251,7 +1251,9 @@ React Native 工程必须在 iOS 和 Android 中注册同一个 `fragmentarticle
 `api.iamchatgpt.top` 的 HTTP Host 和 TLS SNI。原因高度集中在域名包含
 `chatgpt`，不是 Caddy、证书或 UFW 故障。国内正式发布应更换不含敏感
 关键词的中性域名；Cloudflare 仍需要客户端发送原域名 SNI，不能可靠规避。
-当前迁移目标为 `api.theaimoment.com`，Tailscale URL 继续保留为回滚入口。
+2026-07-26 已迁移到 `api.theaimoment.com`：Let's Encrypt 证书签发成功，
+Mac 国内网络与 VPS 均可达，根路径和 Studio 返回 `404`。Tailscale URL
+继续保留为回滚入口。
 
 服务端配置：
 
@@ -1316,13 +1318,13 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 
 截至 2026-07-26，已经完成并有实测证据的内容：
 
-- 部署 revision 为 `539e23c209c5247c1870cbe6ea2ffea550b43d87`；
+- Functions/备份加固 revision 为 `539e23c209c5247c1870cbe6ea2ffea550b43d87`，中性域名迁移 revision 为 `df5afc1ad8ea7efcf80b2b1e7dc62f52b2a42a79`；
 - 公网 SSH 只监听 `2222`，仅 `fragmentops` ed25519 公钥登录，root 和密码登录均被拒绝；
 - root recovery password 已轮换，新值只存于 macOS Keychain 服务 `fragmentarticle-racknerd-root-recovery`；
 - UFW 默认拒绝入站，仅放行公网 `80/443/2222` 和 Tailscale 回滚接口；
 - VPS 和 Mac mini 加入同一 Tailscale 网络；
 - Tailscale Serve 私网 HTTPS `:8443` 可达，证书验证通过；
-- Caddy `2.11.4` 和 Let's Encrypt 证书生效，只允许 Auth、REST、Functions；
+- `api.theaimoment.com` 从 VPS 和当前国内 Mac 网络均可达，Caddy `2.11.4` 和 Let's Encrypt 证书生效，只允许 Auth、REST、Functions；
 - Docker `29.6.2`、Compose `5.3.1`；
 - Supabase CLI `2.72.7`；
 - 官方 Supabase 固定为 `self-hosted/v0.7.0`；
@@ -1335,6 +1337,7 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 - 匿名 `openai-proxy` 和 `content-extractor` 均返回 `401`；
 - 临时登录账号通过 VPS Function 完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；无效模型和客户端提交 API Key 均返回 `400`，验收账号随后删除；
 - 数据库只保留 1 个 owner，公开注册返回 `422`，Auth health 返回 `200`；
+- 本机 `.env.local` 和 Vite 代理已切换到新域名，代理 Auth health 返回 `200`，匿名 AI 与正文提取返回 `401`，浏览器重载后无新增错误；
 - 登录用户的浏览器链接导入走 `content-extractor`，错误直接显示；仅未登录访客收到 `401` 后才降级 Jina，掘金文章的 26 张图片均以真实 `<img>` 渲染；
 - 带文本层 PDF 和扫描 PDF 均完成浏览器提取/OCR，网络记录确认没有 PDF 上传请求；
 - 注册自动确认、退出、重新登录、刷新恢复和登录用户资料持久化通过；
@@ -1346,7 +1349,6 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 
 仍未进入当前开发阶段的内容：
 
-- 不含敏感关键词的中性正式域名；
 - SMTP、邮箱确认和密码找回；
 - AI 每用户日额度、调用审计和 `429`；
 - 网页提取的公网 IP 限流与完整 SSRF 回归；
@@ -1355,14 +1357,13 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 
 ## 20. 对外用户发布前的硬性门槛
 
-1. 把 `api.iamchatgpt.top` 换成大陆网络可达的中性域名，并重跑公网验收；
-2. 在 React Native 工程注册 `fragmentarticle` deep link 并完成真机回调；
-3. 接入 SMTP，关闭邮箱自动确认，完成密码找回；
-4. 增加 AI 每日额度、调用审计和滥用保护；
-5. 完成网页提取的完整 SSRF 防护和 IP 限流；
-6. 确认 Studio、PostgreSQL、Supavisor 仍只允许私网；
-7. 确认最近一次加密备份和完整恢复演练仍通过；
-8. 再部署正式 AI Key 和真实用户数据。
+1. 在 React Native 工程注册 `fragmentarticle` deep link 并完成真机回调；
+2. 接入 SMTP，关闭邮箱自动确认，完成密码找回；
+3. 增加 AI 每日额度、调用审计和滥用保护；
+4. 完成网页提取的完整 SSRF 防护和 IP 限流；
+5. 确认 Studio、PostgreSQL、Supavisor 仍只允许私网；
+6. 确认最近一次加密备份和完整恢复演练仍通过；
+7. 再部署正式 AI Key 和真实用户数据。
 
 ## 21. 命令速查
 
@@ -1395,6 +1396,13 @@ sudo scripts/supabase/verify-private.sh \
 # 私网 HTTPS
 tailscale serve --https=8443 --bg http://127.0.0.1:8000
 tailscale serve status
+
+# 公网 API 验收
+sudo scripts/supabase/verify-public.sh \
+  api.theaimoment.com \
+  107.175.95.166 \
+  2222 \
+  /opt/fragment-article/supabase
 
 # 服务状态
 cd /opt/fragment-article/supabase/docker

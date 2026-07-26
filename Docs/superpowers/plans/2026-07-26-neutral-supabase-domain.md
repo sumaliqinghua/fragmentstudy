@@ -40,13 +40,13 @@ Supabase public URL while preserving `DISABLE_SIGNUP=true`.
 - Consumes: `api.theaimoment.com -> 107.175.95.166`
 - Produces: committed Caddy policy and operator commands for the neutral domain
 
-- [ ] **Step 1: Replace the active API hostname**
+- [x] **Step 1: Replace the active API hostname**
 
 Set the Caddy site label and active examples to `api.theaimoment.com`. Use
 `https://theaimoment.com/**` and `https://www.theaimoment.com/**` only as
 future Web Auth redirect allowlist entries.
 
-- [ ] **Step 2: Keep the URL fixture representative**
+- [x] **Step 2: Keep the URL fixture representative**
 
 Run:
 
@@ -58,7 +58,7 @@ Expected: the four URL keys change to the neutral domain, `DISABLE_SIGNUP=true`
 survives, file mode remains `0600`, one rollback backup exists, and exactly one
 final `mv` occurs.
 
-- [ ] **Step 3: Validate the repository**
+- [x] **Step 3: Validate the repository**
 
 Run:
 
@@ -73,7 +73,7 @@ git diff --check
 
 Expected: all commands exit `0`; the existing ESLint warnings remain non-errors.
 
-- [ ] **Step 4: Commit deployable artifacts**
+- [x] **Step 4: Commit deployable artifacts**
 
 Create a Lore commit that records the domestic SNI/Host reset and the neutral
 domain decision.
@@ -90,7 +90,7 @@ domain decision.
 - Consumes: committed Caddy policy
 - Produces: valid public TLS and the unchanged three-prefix allowlist
 
-- [ ] **Step 1: Confirm DNS and current recovery paths**
+- [x] **Step 1: Confirm DNS and current recovery paths**
 
 Run:
 
@@ -103,14 +103,14 @@ ssh fragmentarticle-backup "tailscale serve status"
 Expected: DNS returns `107.175.95.166`, Caddy is active, and Tailscale `:8443`
 still proxies loopback Kong.
 
-- [ ] **Step 2: Backup, install, validate, and reload**
+- [x] **Step 2: Backup, install, validate, and reload**
 
 Install the committed file through a root-owned temporary path, run
 `caddy validate`, then `systemctl reload caddy`. If validation or reload fails,
 restore `/etc/caddy/Caddyfile.pre-theaimoment-20260726` and reload the old
 configuration.
 
-- [ ] **Step 3: Verify certificate and route boundary**
+- [x] **Step 3: Verify certificate and route boundary**
 
 Run from both the VPS and Mac:
 
@@ -134,7 +134,7 @@ Expected: Auth health succeeds; root and Studio return `404`.
 - Consumes: `https://api.theaimoment.com`
 - Produces: new Auth/API external URLs while preserving owner-only signup
 
-- [ ] **Step 1: Run the committed atomic configuration script**
+- [x] **Step 1: Run the committed atomic configuration script**
 
 Use:
 
@@ -145,19 +145,19 @@ redirects: fragmentarticle://auth/callback,http://localhost:5174/**,http://local
 install root: /opt/fragment-article/supabase
 ```
 
-- [ ] **Step 2: Verify non-secret settings**
+- [x] **Step 2: Verify non-secret settings**
 
 Check only `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL`, `SITE_URL`,
 `ADDITIONAL_REDIRECT_URLS`, and `DISABLE_SIGNUP`. Expected:
 `DISABLE_SIGNUP=true`; do not print any key, secret, password, or token.
 
-- [ ] **Step 3: Recreate only affected services**
+- [x] **Step 3: Recreate only affected services**
 
 Recreate `auth`, `studio`, and `functions` with the existing private Compose
 override. Wait for health and confirm all eight approved services are healthy;
 disabled services must remain absent.
 
-- [ ] **Step 4: Run public verification**
+- [x] **Step 4: Run public verification**
 
 Execute `verify-public.sh api.theaimoment.com 107.175.95.166 2222` on the VPS.
 Expected: TLS, approved routes, anonymous Function rejection, and private port
@@ -176,7 +176,7 @@ boundaries all pass.
 - Consumes: verified public API
 - Produces: local Web/React Native development configuration and durable record
 
-- [ ] **Step 1: Change the local public URL**
+- [x] **Step 1: Change the local public URL**
 
 Set:
 
@@ -188,19 +188,19 @@ VITE_SUPABASE_BROWSER_URL=/supabase-proxy
 Keep `VITE_SUPABASE_ANON_KEY` unchanged. Restart Vite so its proxy loads the new
 target.
 
-- [ ] **Step 2: Run client smoke checks**
+- [x] **Step 2: Run client smoke checks**
 
 Confirm the App loads, Auth health is reachable through `/supabase-proxy`, and
 anonymous AI/content extraction still returns `401`. Existing owner login is
 not changed by the domain migration.
 
-- [ ] **Step 3: Record rollout evidence**
+- [x] **Step 3: Record rollout evidence**
 
 Record the exact Git revision, certificate/route verification, eight healthy
 containers, preserved `DISABLE_SIGNUP=true`, domestic reachability, and the
 continuing Tailscale rollback URL.
 
-- [ ] **Step 4: Commit evidence**
+- [x] **Step 4: Commit evidence**
 
 Create a Lore commit for the completed neutral-domain rollout. Do not push
 unless explicitly requested.

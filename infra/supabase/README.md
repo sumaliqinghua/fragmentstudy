@@ -207,14 +207,15 @@ scripts/supabase/backup-private.sh \
 部署 revision：
 
 ```text
-539e23c209c5247c1870cbe6ea2ffea550b43d87
+Functions/备份加固: 539e23c209c5247c1870cbe6ea2ffea550b43d87
+中性域名迁移: df5afc1ad8ea7efcf80b2b1e7dc62f52b2a42a79
 ```
 
 已通过：
 
 - SSH 只监听 `2222`，仅 `fragmentops` 可用 ed25519 公钥登录并执行 `sudo -n`；root 和密码登录均被拒绝；
 - UFW 默认拒绝入站，仅放行公网 `80/443/2222` 和 Tailscale 回滚接口；
-- Caddy `2.11.4` 与 Let's Encrypt 证书有效，只代理 Auth、REST 和 Functions；根路径与 Studio 返回 `404`；
+- `api.theaimoment.com` 从 VPS 和当前国内 Mac 网络均可达，Caddy `2.11.4` 与 Let's Encrypt 证书有效，只代理 Auth、REST 和 Functions；根路径与 Studio 返回 `404`；
 - `auth`、`studio`、`functions` 只按需重建，8 个批准容器健康，5 个禁用服务缺席；
 - 匿名 `openai-proxy` 与 `content-extractor` 返回 `401`；
 - 临时登录账号完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；非法模型和客户端自带 Key 返回 `400`，账号随后删除；
@@ -222,16 +223,15 @@ scripts/supabase/backup-private.sh \
 - 19 条迁移无待应用项，数据库 lint 零错误，RLS `6/6` 通过后回滚；
 - root recovery password 已轮换，新值仅存于 macOS Keychain 服务 `fragmentarticle-racknerd-root-recovery`。
 
-国内网络风险：VPS 本机和 Let's Encrypt 验证节点访问
+旧域名事件：VPS 本机和 Let's Encrypt 验证节点访问
 `api.iamchatgpt.top` 正常，但当前中国大陆网络会在请求到达 Caddy 前重置
-该域名的 HTTP Host 和 TLS SNI；同一 IP 的 TCP 与中性 SNI 可达。正式国内
-发布必须换用不含 `chatgpt` 的中性域名。Cloudflare 代理不会隐藏客户端
-可见的 SNI，因此不能作为这个问题的可靠修复。本机 `.env.local` 暂时继续
-使用 Tailscale 私网 URL。
+该域名的 HTTP Host 和 TLS SNI；同一 IP 的 TCP 与中性 SNI 可达。Cloudflare
+代理不会隐藏客户端可见的 SNI，因此不能作为可靠修复。2026-07-26 已迁移到
+`api.theaimoment.com`，Mac `.env.local` 与 Vite 代理已切换并通过 Auth health、
+匿名 Function 拒绝和页面加载验收。Tailscale 私网 URL 继续作为回滚入口。
 
 ## 已明确延期的事项
 
-- 中性公网域名及 React Native/Web 客户端切换；
 - SMTP、邮箱确认和密码找回；
 - 数据库级 AI 日额度、调用审计和 `429`；
 - 网页提取的公网 IP 限流及完整 SSRF 回归；
