@@ -1336,7 +1336,8 @@ Cloudflare、删除 Tailscale、Storage、Realtime、原始 PDF 上传和 RAG �
 - RLS 双用户测试 6/6 通过并回滚；
 - 匿名 `openai-proxy` 和 `content-extractor` 均返回 `401`；
 - 临时登录账号通过 VPS Function 完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；无效模型和客户端提交 API Key 均返回 `400`，验收账号随后删除；
-- 数据库只保留 1 个 owner，公开注册返回 `422`，Auth health 返回 `200`；
+- 数据库只保留 1 个正式 owner；2026-07-26 已将无业务数据的验收用户原地替换，owner 密码登录返回 `200`，公开注册保持关闭并返回 `422`；
+- owner 密码仅存于 macOS Keychain 服务 `fragmentarticle-supabase-owner`，不在仓库、服务器配置或本文记录明文；
 - 本机 `.env.local` 和 Vite 代理已切换到新域名，代理 Auth health 返回 `200`，匿名 AI 与正文提取返回 `401`，浏览器重载后无新增错误；
 - 登录用户的浏览器链接导入走 `content-extractor`，错误直接显示；仅未登录访客收到 `401` 后才降级 Jina，掘金文章的 26 张图片均以真实 `<img>` 渲染；
 - 带文本层 PDF 和扫描 PDF 均完成浏览器提取/OCR，网络记录确认没有 PDF 上传请求；

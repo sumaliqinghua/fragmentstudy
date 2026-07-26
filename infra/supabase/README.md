@@ -219,9 +219,10 @@ Functions/备份加固: 539e23c209c5247c1870cbe6ea2ffea550b43d87
 - `auth`、`studio`、`functions` 只按需重建，8 个批准容器健康，5 个禁用服务缺席；
 - 匿名 `openai-proxy` 与 `content-extractor` 返回 `401`；
 - 临时登录账号完成 RLS REST、网页提取、非流式 AI 和 SSE `[DONE]`；非法模型和客户端自带 Key 返回 `400`，账号随后删除；
-- 数据库仍只有 1 个 owner 用户，公开注册已关闭并返回 `422`，Auth health 返回 `200`；
+- 数据库只有 1 个正式 owner；2026-07-26 已将无业务数据的验收用户原地替换，owner 密码登录返回 `200`，公开注册保持关闭并返回 `422`；
 - 19 条迁移无待应用项，数据库 lint 零错误，RLS `6/6` 通过后回滚；
 - root recovery password 已轮换，新值仅存于 macOS Keychain 服务 `fragmentarticle-racknerd-root-recovery`。
+- Supabase owner 密码仅存于 macOS Keychain 服务 `fragmentarticle-supabase-owner`，仓库和服务器文档均不记录明文。
 
 旧域名事件：VPS 本机和 Let's Encrypt 验证节点访问
 `api.iamchatgpt.top` 正常，但当前中国大陆网络会在请求到达 Caddy 前重置
