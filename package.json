@@ -5,6 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:menu": "node scripts/dev-menu.mjs",
+    "launch": "node scripts/dev-menu.mjs",
+    "dev:app": "vite",
+    "supabase:start": "node scripts/supabase-local.mjs start",
+    "supabase:stop": "node scripts/supabase-local.mjs stop",
+    "supabase:status": "node scripts/supabase-local.mjs status",
+    "supabase:reset": "node scripts/supabase-local.mjs reset",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
