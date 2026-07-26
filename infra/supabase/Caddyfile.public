@@ -1,4 +1,4 @@
-api.iamchatgpt.top {
+api.theaimoment.com {
 	encode zstd gzip
 
 	header {

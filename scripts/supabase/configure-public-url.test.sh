@@ -6,7 +6,7 @@ ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT"' EXIT
 
 ENV_FILE="$ROOT/docker/.env"
-REDIRECTS='fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://iamchatgpt.top/**,https://www.iamchatgpt.top/**'
+REDIRECTS='fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://theaimoment.com/**,https://www.theaimoment.com/**'
 FAKE_BIN="$ROOT/bin"
 export REAL_MV="$(command -v mv)"
 export MV_COUNTER="$ROOT/mv-counter"
@@ -34,13 +34,13 @@ printf '%s\n' \
 chmod 0600 "$ENV_FILE"
 
 PATH="$FAKE_BIN:$PATH" "$SCRIPT_DIR/configure-public-url.sh" \
-  'https://api.iamchatgpt.top' \
+  'https://api.theaimoment.com' \
   'fragmentarticle://auth/callback' \
   "$REDIRECTS" \
   "$ROOT"
 
-grep -Fx 'SUPABASE_PUBLIC_URL=https://api.iamchatgpt.top' "$ENV_FILE"
-grep -Fx 'API_EXTERNAL_URL=https://api.iamchatgpt.top/auth/v1' "$ENV_FILE"
+grep -Fx 'SUPABASE_PUBLIC_URL=https://api.theaimoment.com' "$ENV_FILE"
+grep -Fx 'API_EXTERNAL_URL=https://api.theaimoment.com/auth/v1' "$ENV_FILE"
 grep -Fx 'SITE_URL=fragmentarticle://auth/callback' "$ENV_FILE"
 grep -Fx "ADDITIONAL_REDIRECT_URLS=$REDIRECTS" "$ENV_FILE"
 grep -Fx 'DISABLE_SIGNUP=true' "$ENV_FILE"

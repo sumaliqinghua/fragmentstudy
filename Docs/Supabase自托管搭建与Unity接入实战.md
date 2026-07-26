@@ -1203,7 +1203,7 @@ React Native
     |
     | HTTPS 443
     v
-api.iamchatgpt.top
+api.theaimoment.com
     |
     v
 Caddy
@@ -1240,26 +1240,26 @@ Caddy 只允许：
 客户端使用：
 
 ```text
-Supabase URL: https://api.iamchatgpt.top
+Supabase URL: https://api.theaimoment.com
 Auth callback: fragmentarticle://auth/callback
 ```
 
 React Native 工程必须在 iOS 和 Android 中注册同一个 `fragmentarticle` scheme，才能接收 OAuth 或密码重置回调。当前 React 仓库不包含 React Native 原生工程，因此服务器可以验证允许的 redirect URL，但最终 deep link 跳转仍需在 React Native 工程中验收。
 
-2026-07-26 实测发现，VPS 本机和 Let's Encrypt 验证节点可以正常访问该
+2026-07-26 实测发现，VPS 本机和 Let's Encrypt 验证节点可以正常访问旧
 域名，但当前中国大陆网络会在请求到达 Caddy 前重置
 `api.iamchatgpt.top` 的 HTTP Host 和 TLS SNI。原因高度集中在域名包含
 `chatgpt`，不是 Caddy、证书或 UFW 故障。国内正式发布应更换不含敏感
 关键词的中性域名；Cloudflare 仍需要客户端发送原域名 SNI，不能可靠规避。
-当前 Mac 的 `.env.local` 继续使用 Tailscale URL，避免本地开发中断。
+当前迁移目标为 `api.theaimoment.com`，Tailscale URL 继续保留为回滚入口。
 
 服务端配置：
 
 ```dotenv
-SUPABASE_PUBLIC_URL=https://api.iamchatgpt.top
-API_EXTERNAL_URL=https://api.iamchatgpt.top/auth/v1
+SUPABASE_PUBLIC_URL=https://api.theaimoment.com
+API_EXTERNAL_URL=https://api.theaimoment.com/auth/v1
 SITE_URL=fragmentarticle://auth/callback
-ADDITIONAL_REDIRECT_URLS=fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://iamchatgpt.top/**,https://www.iamchatgpt.top/**
+ADDITIONAL_REDIRECT_URLS=fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://theaimoment.com/**,https://www.theaimoment.com/**
 ```
 
 客户端只能持有 anon key。AI Key、service-role key、JWT secret 和数据库密码仍只存在 VPS。

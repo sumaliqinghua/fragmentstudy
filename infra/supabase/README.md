@@ -86,7 +86,7 @@ sudo docker compose \
 
 ## 公网 App API
 
-公网阶段使用 `api.iamchatgpt.top`，但继续保留 Tailscale `:8443` 作为回退入口。必须先验证非 root SSH `2222`，再释放 `443` 给 Caddy。公网只批准：
+公网阶段使用 `api.theaimoment.com`，但继续保留 Tailscale `:8443` 作为回退入口。必须先验证非 root SSH `2222`，再释放 `443` 给 Caddy。公网只批准：
 
 ```text
 /auth/v1/*
@@ -135,9 +135,9 @@ sudo journalctl -u caddy -n 100 --no-pager
 
 ```bash
 sudo scripts/supabase/configure-public-url.sh \
-  https://api.iamchatgpt.top \
+  https://api.theaimoment.com \
   fragmentarticle://auth/callback \
-  'fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://iamchatgpt.top/**,https://www.iamchatgpt.top/**' \
+  'fragmentarticle://auth/callback,http://localhost:5174/**,http://localhost:5183/**,https://theaimoment.com/**,https://www.theaimoment.com/**' \
   /opt/fragment-article/supabase
 ```
 
@@ -145,7 +145,7 @@ sudo scripts/supabase/configure-public-url.sh \
 
 ```bash
 sudo scripts/supabase/verify-public.sh \
-  api.iamchatgpt.top \
+  api.theaimoment.com \
   107.175.95.166 \
   2222 \
   /opt/fragment-article/supabase
