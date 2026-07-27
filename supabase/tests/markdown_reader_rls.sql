@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
-SELECT plan(17);
+SELECT plan(20);
 
 INSERT INTO auth.users (
   id,
@@ -188,6 +188,38 @@ SELECT is(
   (SELECT count(*) FROM public.markdown_reader_chat_threads),
   1::bigint,
   'user A sees only their own chat threads'
+);
+
+UPDATE public.markdown_reader_annotations
+SET highlight_active = false
+WHERE id = '00000000-0000-0000-0000-0000000000e1';
+
+SELECT is(
+  (
+    SELECT highlight_active
+    FROM public.markdown_reader_annotations
+    WHERE id = '00000000-0000-0000-0000-0000000000e1'
+  ),
+  false,
+  'owner can deactivate the visible highlight'
+);
+SELECT is(
+  (
+    SELECT note_text
+    FROM public.markdown_reader_annotations
+    WHERE id = '00000000-0000-0000-0000-0000000000e1'
+  ),
+  'Private note A',
+  'deactivating a highlight keeps its note'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.markdown_reader_chat_threads
+    WHERE annotation_id = '00000000-0000-0000-0000-0000000000e1'
+  ),
+  1::bigint,
+  'deactivating a highlight keeps linked chat'
 );
 
 SELECT throws_ok(
