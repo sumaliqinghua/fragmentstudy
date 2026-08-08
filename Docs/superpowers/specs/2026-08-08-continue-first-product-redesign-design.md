@@ -1,8 +1,8 @@
 # FragmentStudy Product Redesign — Continue-First Micro Reader
 
 **Date:** 2026-08-08  
-**Status:** Draft for review (product idea & UX direction; not visual/Figma/implementation spec)  
-**Related:** `Docs/需求.md` (original PRD), `Docs/想法.md` (idea bank)  
+**Status:** Approved (product idea & UX direction; not visual/Figma/implementation spec)  
+**Related:** `Docs/需求.md` (original PRD), `Docs/想法.md` (idea bank), `Docs/superpowers/plans/2026-08-08-continue-first-spine.md`  
 **Approach:** Continue-first Micro Reader (Approach 1), with light guided explain + optional quiz
 
 ---
