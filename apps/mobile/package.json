@@ -30,8 +30,11 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "ENTERPRISE_REPOSITORY=https://maven.aliyun.com/repository/central expo run:ios",
+    "ios:go": "node ./scripts/install-expo-go-ios.mjs",
+    "ios:run": "ENTERPRISE_REPOSITORY=https://maven.aliyun.com/repository/central expo run:ios",
+    "ios:pods": "ENTERPRISE_REPOSITORY=https://maven.aliyun.com/repository/central pod install --project-directory=ios",
     "web": "expo start --web"
   },
   "private": true

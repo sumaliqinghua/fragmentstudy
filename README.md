@@ -212,6 +212,26 @@ QINIU_MODEL=qwen/qwen3.7-plus
 
 使用远程 / 自托管 Supabase 时，在 `.env.local` 配置 `VITE_SUPABASE_*`，执行 `npm run dev` 或 `npm run dev:menu` 选「远程」即可。
 
+### Mobile（Expo / iOS Simulator）
+
+Continue-first 客户端在 `apps/mobile/`。**不要用 Expo Go 自动下载**（SDK 57 + CDN 常超时）；用本地 Xcode 构建。
+
+**一次环境准备：**
+
+1. Xcode + iOS Simulator  
+2. `brew install cocoapods`（勿等 Expo 的 gem 安装卡住）  
+3. `cd apps/mobile && npm install`  
+4. 配置 `apps/mobile/.env`（或用下面的菜单自动写）  
+5. `npm run ios`（首次编译较久；Hermes 已默认走阿里云 Maven 镜像）
+
+```bash
+# 仓库根目录 — 本地 Supabase + iOS
+npm run mobile:dev
+npm run mobile:ios
+```
+
+完整清单与排障：[`Docs/superpowers/specs/2026-08-24-mobile-dev-environment.md`](Docs/superpowers/specs/2026-08-24-mobile-dev-environment.md) · [`apps/mobile/README.md`](apps/mobile/README.md)
+
 ### 关于提交 `supabase/config.toml`
 
 **可以且应该提交。** Supabase 官方建议把以下内容纳入版本控制：
@@ -242,8 +262,10 @@ supabase functions deploy content-extractor
 
 ```bash
 npm run dev            # 仅 Vite
-npm run dev:menu       # 方向键开发菜单
+npm run dev:menu       # 方向键开发菜单（Web）
 npm run launch         # 同上（别名）
+npm run mobile:dev     # Mobile 开发菜单（本地 Supabase + iOS/Android）
+npm run mobile:ios     # 本地 Supabase + expo run:ios
 npm run build          # 生产构建
 npm run preview        # 预览构建产物
 npm run typecheck      # TypeScript 类型检查
@@ -319,6 +341,8 @@ npm run test           # 运行 services 层单元测试
 | [`Docs/TECHNICAL_DOC.md`](Docs/TECHNICAL_DOC.md) | 详细技术文档 |
 | [`Docs/fal-ai-integration.md`](Docs/fal-ai-integration.md) | fal.ai 图片生成集成 |
 | [`Docs/superpowers/plans/`](Docs/superpowers/plans/) | Supabase 持久化与自托管部署计划 |
+| [`Docs/superpowers/specs/2026-08-24-mobile-dev-environment.md`](Docs/superpowers/specs/2026-08-24-mobile-dev-environment.md) | Mobile iOS/Android 环境准备清单 |
+| [`apps/mobile/README.md`](apps/mobile/README.md) | Expo 客户端说明与快速启动 |
 
 ---
 
