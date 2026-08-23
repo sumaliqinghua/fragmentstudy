@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-08  
 **Status:** Approved (product idea & UX direction; not visual/Figma/implementation spec)  
-**Related:** `Docs/需求.md` (original PRD), `Docs/想法.md` (idea bank), `Docs/superpowers/plans/2026-08-08-continue-first-spine.md`  
+**Related:** `Docs/需求.md` (original PRD), `Docs/想法.md` (idea bank), `Docs/superpowers/specs/2026-08-10-figma-design-brief.md` (Figma brief), `Docs/superpowers/plans/2026-08-08-continue-first-spine.md` (optional eng plan — defer until after Figma)  
 **Approach:** Continue-first Micro Reader (Approach 1), with light guided explain + optional quiz
 
 ---
@@ -29,7 +29,7 @@ People who **struggle to start** long reading or learning texts. The product low
 |----|----------------------------|
 | Micro-habit for long-form text | Multi-mode entertainment learner as the core |
 | Cards-first reading | Chat / visual novel as default |
-| Soft Duolingo-shaped streak & rewards | Hard quotas, shame-y streak pressure |
+| Soft Duolingo-shaped path, gifts, streak & celebrations | Hard quotas, shame-y streak pressure, pets/shop/leaderboards |
 | Optional quiz on demand | Quiz-gated progress or import-time quiz commitment |
 | Sample-first for visitors; login for AI | Full AI product usable as anonymous guest |
 
@@ -39,11 +39,11 @@ People who **struggle to start** long reading or learning texts. The product low
 
 1. **Visitor:** Try a **pre-built sample material** (no AI) → feel Continue + cards + stop completion.
 2. **Login:** Unlocks **AI** (import/split, explain, quiz generate).
-3. **Import** a long text (paste / link / file — existing sources).
-4. AI splits into **cards**, groups into **关卡** (see §4).
-5. **Home → Continue** into the current 关卡 of the last-touched material.
-6. Read cards one by one; **select text → explain**; micro-feedback (points, motion, haptic).
-7. **Finish the 关卡** → streak + stronger celebration.
+3. **Import** a long text (paste / link / file). **Content is the job**; title is optional — if empty, AI names the material.
+4. AI **distills** the long text into **cards** (core ideas, not raw chunking), groups them into **关卡** (see §4). Each card keeps a **link back to its original passage**.
+5. **Home** shows the current material’s **关卡 path** (steps + gift chests) with **Continue** on the current node.
+6. Read cards one by one; jump to **原文** to verify or read around the idea; **select text → AI explain** (primary), plus **highlight / note**; micro-feedback (points, motion, haptic).
+7. **Finish the 关卡** → celebration animation + gift if the node has one + streak.
 8. **Quiz** optional (entrance or soft prompt); never blocks Continue.
 9. Tomorrow: same Continue path.
 
@@ -55,7 +55,7 @@ People who **struggle to start** long reading or learning texts. The product low
 
 | Tab | Role |
 |-----|------|
-| **Home** | Habit status + Continue |
+| **Home** | Streak + current material **path (steps + gifts)** + Continue |
 | **+** (center) | Import flow only (not a content tab) |
 | **Library** | Materials list + account / light settings entry |
 
@@ -64,14 +64,18 @@ One clear import entry (center `+`). Do **not** also use a floating `+` on Home 
 ### 3.2 Home
 
 - Soft streak + today’s status (e.g. “Stop done” / “1 stop to keep streak”).
-- **Big Continue** → current 关卡 of last-touched material (or sample, if guest).
-- Quiet list: other in-progress materials (title + stop progress); switch when intentional.
+- **Current material’s 关卡 path** (Duolingo-style): visible steps ahead/behind, gift/chest nodes on the path, current node highlighted.
+- **Continue** is the action on the **current node** (tap the node or a Continue button anchored to it) — not a dashboard that hides the path.
+- Quiet switcher: other in-progress materials (title + stop progress); switching changes which path is shown.
 - **Empty (logged-in, no materials):** CTA to import a long text.
-- **Guest:** Continue into sample; `+` leads to login to import own text.
+- **Guest:** Sample material path + Continue; `+` leads to login to import own text.
+
+Home should feel like *one trail you are walking*, not a file manager. Path + gifts are how progress becomes fun; Continue is still the one tap to start.
 
 ### 3.3 Import (`+`)
 
-- One job: get text in → processing → land ready to Continue (first 关卡).
+- One job: get **content** in → processing → land ready to Continue (first 关卡).
+- **Title is optional and visually secondary.** The paste/body (or link/file) is the focus. Placeholder: title can be filled later; if the user leaves it blank, **AI generates a title** from the content during split.
 - **No** mode picker (cards only).
 - **No** “enable quiz” checkbox at import.
 - **Logged-out:** tapping `+` prompts login (AI required). Sample remains available without import.
@@ -79,35 +83,48 @@ One clear import entry (center `+`). Do **not** also use a floating `+` on Home 
 ### 3.4 Reader (card session)
 
 - Session scope = **current 关卡** (progress: card *i* / *n* within the stop).
-- Actions: next/back; select text → explain; optional original-text jump; keep bookmark/note only if already cheap.
-- End of 关卡: celebration + points + streak update; CTAs: next stop / done for today / soft “Quick quiz?”
-- Delight: card complete = short motion + haptic; 关卡 clear = short celebration (not a long interstitial).
+- Card body = **distilled core content** (easier to learn in a bite); not a dump of the raw paragraph.
+- Actions: next/back; **原文** — jump to the linked original span (highlighted in context) to verify or read more, then return to the card.
+- **Select text** (on the card) → compact toolbar:
+  - **讲解** (primary) — AI explain; login required (sample: pre-authored or login prompt).
+  - **高亮** — mark the span on the card.
+  - **笔记** — short note attached to the span.
+  - No extra annotation types in v1 (no underline/bold/bookmark as separate tools).
+- End of 关卡: **celebration animation** (see §5.3) + points + streak; if the path node was a gift, **open the chest**; CTAs: next stop / done for today / soft “Quick quiz?”
+- Delight: card complete = short motion + haptic; 关卡 clear = a real (but short) celebration beat, then CTAs.
 
 ### 3.5 Library
 
 - Materials: in progress / done.
-- Material overview: 关卡 path, Continue this material, **Quiz** entrance.
+- Material overview: same 关卡 path + gifts as Home (full trail), Continue this material, **Quiz** entrance.
 - Account: login / logout; settings (including any AI/provider config for authenticated users as the product already requires).
 
 ### 3.6 Deferred out of primary IA
 
 - Chat / visual novel as separate modes.
 - Required subject/taxonomy trees.
-- Full reward shop; pets, maps, leaderboards, live rooms.
+- Full reward shop; pets, world maps, leaderboards, live rooms (path + chests on the *current material* are in scope).
 
 ---
 
 ## 4. Content model: cards & 关卡
 
 ```text
-Material (article)
+Material (article / original text)
   └── 关卡 / Stop
-        └── Cards (one idea each)
+        └── Cards (one distilled core idea each)
+              └── link → original passage (for verify / deep-read)
 ```
+
+### 4.0 What a card is
+
+- **Distill, don’t just chop.** Each card extracts / rephrases the **important core** of a semantic unit so fragmented learning is lighter than reading the full article. Prefer clarity and one idea per card over copying long verbatim blocks.
+- **Always stay accountable to the source.** Every card stores a link (span / offset / quote anchor) into `original_content`. From the reader, **原文** opens that passage highlighted in context so the user can 查证 or read around it, then return.
+- Cards are the **learning surface**; the original is the **ground truth**. Neither replaces the other.
 
 ### 4.1 How 关卡 are defined (hybrid)
 
-1. AI proposes **semantic sections** (natural chapter/argument boundaries).
+1. AI proposes **semantic sections** (natural chapter/argument boundaries) and **distills** cards within them.
 2. If a section is too large, **auto-split** into stops of about **3–5 cards** each.
 3. Target feel: one stop ≈ a short Duolingo-style lesson (~2–4 minutes), not a single 2-sentence card and not a whole article.
 
@@ -116,8 +133,9 @@ Material (article)
 | Event | Effect |
 |-------|--------|
 | **Card complete** | Micro-win: small points + animation/haptic. Does **not** alone keep the streak. |
-| **关卡 complete** | Day counts for streak + larger celebration + more points. |
-| **Material complete** | Finish moment (optional badge later). Not required for daily habit. |
+| **关卡 complete** | Day counts for streak + **celebration animation** + more points. If this node has a gift, the chest opens here. |
+| **Gift / chest** | Placed on the path (e.g. after every few 关卡, plus a finish chest). Opening is the reward moment — points (and later, freeze fuel). Not a shop. |
+| **Material complete** | Finish moment (path fully lit + stronger celebration). Not required for daily habit. |
 
 Users may browse back; streak credits only when a 关卡 is **fully finished**.
 
@@ -139,20 +157,32 @@ Users may browse back; streak credits only when a 关卡 is **fully finished**.
 - Per card: small; per 关卡: larger; quiz correct (if used): small bonus.
 - v1: points are visible fuel for future restores — **no shop**, no paywall tied to points.
 
-### 5.3 Motion & haptic
+### 5.3 Path, gifts, motion & haptic
 
-- Intentional feedback on card complete, 关卡 clear, and streak up — enough to make “one more card” feel good inside a stop.
-- Avoid noisy always-on effects.
+**Path (fun, still light)**  
+Show each 关卡 as a node on a trail (done / current / upcoming). Scatter **gift chests** on the trail so the next reward is visible before you start — Duolingo’s “I can see the next step and a gift,” not a separate game world.
+
+**Celebrations**  
+- Card complete: small (check, +points, haptic).  
+- 关卡 complete: **designed celebration** — character/mascot optional but not required; confetti/burst, chest-open if gifted, streak flame, then CTAs. Aim ~1.5–2.5s of delight, then user control — not a skippable 8-second interstitial.  
+- Material complete: one stronger finish beat.
+
+**Tone**  
+Borrow Duolingo’s *visible progress + gifts + celebration*, not guilt, daily quest boards, or a shop. Avoid noisy always-on effects between cards.
 
 ---
 
 ## 6. In-session guidance & quiz
 
-### 6.1 Guided explain (default session depth)
+### 6.1 Select text: explain + light notes
 
-- Select a sentence/phrase → AI explain (light presets: e.g. simpler / analogy / tie to earlier).
-- Optional; does not affect streak.
-- Requires login (AI). On sample material, either omit explain or use pre-authored helper content only—no live AI for guests.
+Toolbar after selection (order):
+
+1. **讲解** — primary. AI explain with light presets (simpler / analogy / tie to earlier). Login required; sample uses pre-authored help or a login prompt — no live AI for guests.
+2. **高亮** — persist a highlight on that span (visible when revisiting the card).
+3. **笔记** — optional short note on that span.
+
+Highlights and notes do not affect streak. They are personal marks, not a second product (no full notebook app, no many markup styles).
 
 ### 6.2 Quiz (optional)
 
@@ -198,7 +228,7 @@ Users may browse back; streak credits only when a 关卡 is **fully finished**.
 
 - Chat / VN as core modes and import mode picker.
 - Import-time quiz checkbox.
-- Heavy gamification (pets, maps, leaderboards, rarities, live rooms).
+- Heavy gamification beyond path + chests (pets, world maps, leaderboards, rarities, live rooms, shop).
 - Hard daily quotas; paid streak restores in v1.
 - Complex subjects as required structure.
 - Quiz gating progress.
@@ -206,8 +236,8 @@ Users may browse back; streak credits only when a 关卡 is **fully finished**.
 
 ### 9.2 Keep / reframe from current product
 
-- Long-text import → AI cards (authenticated).
-- Card reader, original text, select → explain.
+- Long-text import → AI **distilled** cards with **original anchors** (authenticated); **AI title if the user skips title**.
+- Card reader, **原文** jump to linked passage, select → **explain + highlight + note**.
 - Material progress (expressed as 关卡 path).
 - Optional on-demand quiz.
 - Auth (email) + cloud sync for logged-in users.
@@ -240,12 +270,14 @@ Users may browse back; streak credits only when a 关卡 is **fully finished**.
 
 ## 11. Design principles (carry forward)
 
-1. **One primary action** — Continue (or sample Continue) dominates Home.
-2. **Do subtraction** — one card at a time; one stop for the day; no mode maze.
-3. **Micro-win ≠ daily win** — cards delight; 关卡 keeps the streak.
-4. **Soft habit** — Duolingo-shaped rewards without Duolingo-grade punishment.
-5. **AI behind login; value before login** — sample first.
-6. **Quiz serves memory, not the spine** — optional, on demand, never a gate.
+1. **One trail, one tap** — Home shows the current material’s path; Continue starts the current 关卡.
+2. **Do subtraction** — one distilled card at a time; one stop for the day; no mode maze. Import attention stays on **content**, not title.
+3. **Distill + link** — cards teach the core; **原文** always lets users verify and go deeper.
+4. **Micro-win ≠ daily win** — cards delight; 关卡 keeps the streak and unlocks the celebration / gift.
+5. **Soft habit, visible fun** — Duolingo-shaped path, gifts, and celebrations without Duolingo-grade punishment.
+6. **AI behind login; value before login** — sample first.
+7. **Quiz serves memory, not the spine** — optional, on demand, never a gate.
+8. **Marks stay light** — select text: explain first; highlight and note are enough.
 
 ---
 
@@ -256,7 +288,7 @@ These do not block the product idea; resolve in Figma / tech plan:
 - Exact sample material content and localization.
 - Precise card count bounds for auto-split (3–5 as guideline).
 - Whether guest sample streak is discarded at login or merged.
-- Visual language, motion specs, haptic patterns.
+- Visual language, path illustration style, chest art, celebration motion specs, haptic patterns.
 - Provider/quota details for authenticated AI.
 
 ---
@@ -264,3 +296,5 @@ These do not block the product idea; resolve in Figma / tech plan:
 ## Document history
 
 - 2026-08-08: Initial product redesign settled via brainstorming (Continue-first Micro Reader + sample-first auth gate).
+- 2026-08-16: Path + gifts + celebrations on Home; import content-first with optional AI title; select-text explain + highlight + note.
+- 2026-08-23: Cards are distilled core content (not raw chops) with a mandatory link back to the original passage.
